@@ -7,6 +7,13 @@ import type {
 import { ApiError } from './apiTypes';
 import type { CreateInvestigationResponse, TriageZeroApi } from './apiTypes';
 
+// Wire shape returned by the ingestion API for a created investigation.
+// The backend speaks `investigation_id`; the frontend uses `id` internally.
+interface CreateInvestigationWireResponse {
+  investigation_id: string;
+  status: 'received';
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
@@ -31,11 +38,13 @@ export const httpApi: TriageZeroApi = {
   getInvestigation: (id: string) =>
     request<Investigation>(`/api/v1/investigations/${encodeURIComponent(id)}`),
 
-  createInvestigation: (pkg: FailurePackage) =>
-    request<CreateInvestigationResponse>('/api/v1/investigations', {
+  createInvestigation: async (pkg: FailurePackage): Promise<CreateInvestigationResponse> => {
+    const res = await request<CreateInvestigationWireResponse>('/api/v1/investigations', {
       method: 'POST',
       body: JSON.stringify(pkg),
-    }),
+    });
+    return { id: res.investigation_id, status: res.status };
+  },
 
   retryInvestigation: (id: string) =>
     request<Investigation>(

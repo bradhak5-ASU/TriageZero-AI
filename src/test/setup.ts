@@ -22,6 +22,9 @@ if (!navigator.clipboard) {
   });
 }
 
+// jsdom does not implement scrolling — stub it so route changes stay quiet
+window.scrollTo = (() => {}) as typeof window.scrollTo;
+
 class ResizeObserverStub {
   observe() {}
   unobserve() {}
