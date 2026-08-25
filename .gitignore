@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+dist-ssr/
+*.tsbuildinfo
+
+# environment — never commit real env files
+.env
+.env.local
+.env.*.local
+
+# test + coverage artifacts
+coverage/
+test-results/
+playwright-report/
+
+# logs
+*.log
+npm-debug.log*
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.sw?
+
+# misc
+*.local
