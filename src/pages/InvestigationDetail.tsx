@@ -17,6 +17,11 @@ import {
   Target,
 } from 'lucide-react';
 import { EvidencePanel } from '../components/evidence/EvidencePanel';
+import {
+  AnalysisProvenanceCard,
+  HumanResolutionCard,
+  SyntheticBadge,
+} from '../components/investigations/AnalysisProvenance';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { CopyButton } from '../components/ui/CopyButton';
 import { ErrorState, LoadingState } from '../components/ui/States';
@@ -27,10 +32,12 @@ import {
   RiskBadge,
   SeverityBadge,
 } from '../components/ui/StatusBadge';
+import { config } from '../app/config';
 import { useInvestigations } from '../context/InvestigationsContext';
 import { useSettings } from '../context/SettingsContext';
 import { useToast } from '../context/ToastContext';
-import type { ApprovalState, Investigation } from '../types';
+import type { ActionDecision } from '../services/apiTypes';
+import type { Investigation } from '../types';
 import {
   formatConfidence,
   formatDuration,
@@ -50,7 +57,7 @@ const ACTIVE = ['received', 'queued', 'analyzing'];
 
 export function InvestigationDetail() {
   const { investigationId = '' } = useParams();
-  const { getById, fetchById, retry } = useInvestigations();
+  const { getById, fetchById, retry, decide } = useInvestigations();
   const { settings } = useSettings();
   const { pushToast } = useToast();
 
@@ -59,7 +66,6 @@ export function InvestigationDetail() {
   const [notFound, setNotFound] = useState(false);
   const [busy, setBusy] = useState(false);
   const [retryOpen, setRetryOpen] = useState(false);
-  const [approvalOverride, setApprovalOverride] = useState<ApprovalState | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -73,7 +79,6 @@ export function InvestigationDetail() {
 
   useEffect(() => {
     setInv(getById(investigationId));
-    setApprovalOverride(null);
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [investigationId]);
@@ -104,17 +109,25 @@ export function InvestigationDetail() {
     else void doRetry();
   };
 
-  const decide = (state: ApprovalState) => {
-    setApprovalOverride(state);
-    pushToast(
-      state === 'approved'
-        ? 'Approval recorded locally — no external action executed in demo mode'
-        : 'Rejection recorded locally',
-      'info',
-    );
+  const submitDecision = async (decision: ActionDecision) => {
+    setBusy(true);
+    try {
+      const updated = await decide(investigationId, decision);
+      setInv(updated);
+      pushToast(
+        config.useMockApi
+          ? `Decision recorded locally (demo mode) — no external action executed`
+          : `Decision recorded — no external action executed`,
+        decision === 'approve' ? 'ok' : 'info',
+      );
+    } catch (e) {
+      pushToast(e instanceof Error ? e.message : 'Decision failed', 'warn');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const approvalState = approvalOverride ?? inv?.recommendedAction?.approvalState;
+  const approvalState = inv?.recommendedAction?.approvalState;
 
   const detailRows = useMemo(
     () =>
@@ -167,6 +180,7 @@ export function InvestigationDetail() {
             <span className="mono muted" style={{ fontSize: 12.5 }}>{inv.id}</span>
             <InvestigationStatusBadge status={inv.status} />
             {active && <span className="badge badge--ai">{STAGE_META[inv.stage]}</span>}
+            {inv.isSynthetic && <SyntheticBadge />}
           </div>
           <h1 style={{ fontSize: 19 }}>{inv.testName}</h1>
           <p className="sub" style={{ gap: 12 }}>
@@ -346,6 +360,27 @@ export function InvestigationDetail() {
                         <td>
                           <div className="cell-main">{s.testName}</div>
                           <div className="cell-sub mono">{s.id}</div>
+                          {s.matchingSignals && s.matchingSignals.length > 0 && (
+                            <div
+                              style={{
+                                display: 'flex',
+                                gap: 4,
+                                flexWrap: 'wrap',
+                                marginTop: 5,
+                              }}
+                            >
+                              {s.matchingSignals.map((signal) => (
+                                <span
+                                  key={signal}
+                                  className="badge badge--muted"
+                                  style={{ fontSize: 10 }}
+                                  title="Signal that matched these failures"
+                                >
+                                  {signal.replaceAll('_', ' ')}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td>
                           <ClassificationBadge value={s.classification} />
@@ -404,14 +439,26 @@ export function InvestigationDetail() {
                 </dl>
                 {(approvalState === 'awaiting_approval' || approvalState === 'proposed') && (
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button type="button" className="btn btn--primary" onClick={() => decide('approved')}>
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      disabled={busy}
+                      onClick={() => void submitDecision('approve')}
+                    >
                       Approve
                     </button>
-                    <button type="button" className="btn" onClick={() => decide('rejected')}>
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={busy}
+                      onClick={() => void submitDecision('reject')}
+                    >
                       Reject
                     </button>
                     <span className="faint" style={{ fontSize: 12 }}>
-                      Actions are never executed automatically. Approvals here are simulated in demo mode.
+                      {config.useMockApi
+                        ? 'Actions are never executed automatically. Approvals here are simulated in demo mode.'
+                        : 'Actions are never executed automatically. Decisions are recorded server-side only.'}
                     </span>
                   </div>
                 )}
@@ -454,6 +501,13 @@ export function InvestigationDetail() {
               </dl>
             </div>
           </div>
+
+          <AnalysisProvenanceCard meta={inv.aiMetadata} />
+
+          <HumanResolutionCard
+            resolution={inv.humanResolution}
+            prediction={inv.originalPrediction}
+          />
 
           <div className="card">
             <div className="card__header">

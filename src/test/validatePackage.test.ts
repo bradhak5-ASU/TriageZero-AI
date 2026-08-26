@@ -48,6 +48,26 @@ describe('failure-package validation', () => {
     expect(result.errors.some((e) => e.includes('repository.name'))).toBe(true);
   });
 
+  it('warns when the package falls outside the strict v1 contract', () => {
+    const loose = {
+      ...sampleFailurePackage,
+      environment: { ...sampleFailurePackage.environment, browser: 'edge', name: 'qa' },
+      extra_metadata: { anything: true },
+    };
+    const result = validateFailurePackage(loose);
+    // still structurally valid, but the server contract is stricter
+    expect(result.valid).toBe(true);
+    expect(result.warnings.some((w) => w.includes('edge'))).toBe(true);
+    expect(result.warnings.some((w) => w.includes('qa'))).toBe(true);
+    expect(result.warnings.some((w) => w.includes('extra_metadata'))).toBe(true);
+  });
+
+  it('does not warn for the canonical sample package', () => {
+    const result = validateFailurePackage(sampleFailurePackage);
+    expect(result.valid).toBe(true);
+    expect(result.warnings).toHaveLength(0);
+  });
+
   it('reports invalid JSON with a helpful parse error', () => {
     const parsed = parsePackageJson('{not json');
     expect(parsed.error).toBeTruthy();

@@ -1,0 +1,12 @@
+.venv/
+data/
+tests/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+
+# Evaluation fixtures and the PRIVATE ORACLE never belong in a runtime image.
+# Generate them locally with app.evaluation.seed_history when benchmarking.
+evaluation/

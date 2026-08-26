@@ -15,6 +15,23 @@ export const FORBIDDEN_ORACLE_FIELDS = [
   'scenario_name',
 ] as const;
 
+// Closed vocabularies enforced by the backend's strict v1 schema.
+export const SUPPORTED_BROWSERS = ['chromium', 'firefox', 'webkit'];
+export const SUPPORTED_ENVIRONMENTS = ['local', 'staging', 'production'];
+
+const KNOWN_TOP_LEVEL_FIELDS = [
+  'schema_version',
+  'source',
+  'run',
+  'repository',
+  'environment',
+  'test',
+  'failure',
+  'network_evidence',
+  'console_errors',
+  'artifacts',
+];
+
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
@@ -102,6 +119,33 @@ export function validateFailurePackage(input: unknown): ValidationResult {
 
   if (isObject(input) && input.schema_version !== '1.0' && typeof input.schema_version === 'string') {
     warnings.push(`Unrecognized schema_version "${input.schema_version}" — expected "1.0".`);
+  }
+
+  // v1.0 is a closed contract server-side: flag anything the API will reject
+  // so a package that passes here is not surprised by a 422 in real API mode.
+  const environment = isObject(input.environment) ? input.environment : undefined;
+  if (environment) {
+    const browser = environment.browser;
+    if (typeof browser === 'string' && !SUPPORTED_BROWSERS.includes(browser)) {
+      warnings.push(
+        `environment.browser "${browser}" is outside the v1 contract (${SUPPORTED_BROWSERS.join(', ')}) and will be rejected by the API.`,
+      );
+    }
+    const envName = environment.name;
+    if (typeof envName === 'string' && !SUPPORTED_ENVIRONMENTS.includes(envName)) {
+      warnings.push(
+        `environment.name "${envName}" is outside the v1 contract (${SUPPORTED_ENVIRONMENTS.join(', ')}) and will be rejected by the API.`,
+      );
+    }
+  }
+
+  const unknownTopLevel = Object.keys(input).filter(
+    (key) => !KNOWN_TOP_LEVEL_FIELDS.includes(key),
+  );
+  if (unknownTopLevel.length > 0) {
+    warnings.push(
+      `Unknown field(s) not in the v1 contract: ${unknownTopLevel.join(', ')} — the API rejects unknown fields.`,
+    );
   }
 
   const test = isObject(input.test) ? input.test : undefined;

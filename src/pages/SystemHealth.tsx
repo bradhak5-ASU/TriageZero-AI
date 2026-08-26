@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
+  BrainCircuit,
   Gauge,
   Inbox,
   Info,
@@ -13,7 +14,7 @@ import { ColumnsChart } from '../components/charts/ColumnsChart';
 import { ErrorState, LoadingState } from '../components/ui/States';
 import { ServiceStatusBadge } from '../components/ui/StatusBadge';
 import { api } from '../services';
-import type { EventLevel, SystemHealthSnapshot } from '../types';
+import type { AiProviderState, EventLevel, SystemHealthSnapshot } from '../types';
 import { formatDuration, formatRelativeTime } from '../utils/format';
 
 const levelIcons: Record<EventLevel, React.ReactNode> = {
@@ -21,6 +22,27 @@ const levelIcons: Record<EventLevel, React.ReactNode> = {
   warn: <AlertTriangle size={14} style={{ color: 'var(--warn)' }} aria-hidden />,
   error: <XCircle size={14} style={{ color: 'var(--crit)' }} aria-hidden />,
 };
+
+/** Honest provider state — configuration alone is never shown as healthy. */
+function AiStateBadge({ state }: { state: AiProviderState }) {
+  const tone =
+    state === 'healthy'
+      ? 'ok'
+      : state === 'degraded' || state === 'unverified'
+        ? 'warn'
+        : 'muted';
+  const label =
+    state === 'unconfigured'
+      ? 'Unconfigured — no credentials'
+      : state === 'unverified'
+        ? 'Unverified — awaiting first successful call'
+      : state === 'disabled'
+        ? 'Disabled — not selected'
+        : state === 'degraded'
+          ? 'Degraded'
+          : 'Healthy';
+  return <span className={`badge badge--${tone}`}>{label}</span>;
+}
 
 export function SystemHealth() {
   const [snapshot, setSnapshot] = useState<SystemHealthSnapshot | null>(null);
@@ -130,6 +152,64 @@ export function SystemHealth() {
           <div className="kpi__meta">completed investigations</div>
         </div>
       </div>
+
+      {snapshot.ai && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card__header">
+            <h2>
+              <BrainCircuit size={15} style={{ color: 'var(--ai)' }} aria-hidden />
+              AI analysis
+            </h2>
+            <span className="badge badge--ai">mode: {snapshot.ai.analyzerMode}</span>
+          </div>
+          <div className="card__body">
+            <dl className="kv">
+              <dt>Deterministic analyzer</dt>
+              <dd>
+                <ServiceStatusBadge value={snapshot.ai.deterministicStatus} />
+              </dd>
+              <dt>Gemini</dt>
+              <dd>
+                <AiStateBadge state={snapshot.ai.geminiStatus} />
+              </dd>
+              <dt>Google ADK</dt>
+              <dd>
+                <AiStateBadge state={snapshot.ai.adkStatus} />
+              </dd>
+              <dt>Configured model</dt>
+              <dd className="mono">{snapshot.ai.modelName}</dd>
+              <dt>Prompt version</dt>
+              <dd className="mono">{snapshot.ai.promptVersion}</dd>
+              <dt>Fallback</dt>
+              <dd>{snapshot.ai.fallbackEnabled ? 'Enabled' : 'Disabled'}</dd>
+              <dt>Last successful analysis</dt>
+              <dd>
+                {snapshot.ai.lastSuccessAt
+                  ? formatRelativeTime(snapshot.ai.lastSuccessAt)
+                  : '— none yet'}
+              </dd>
+              <dt>Last AI error</dt>
+              <dd className="mono">{snapshot.ai.lastErrorCode ?? '— none'}</dd>
+              <dt>Recent fallbacks</dt>
+              <dd>{snapshot.ai.fallbackCount}</dd>
+              <dt>Historical corpus</dt>
+              <dd>
+                {snapshot.ai.historicalCorpusSize} reviewed case
+                {snapshot.ai.historicalCorpusSize === 1 ? '' : 's'}
+              </dd>
+              <dt>Evaluation datasets</dt>
+              <dd className="mono" style={{ fontSize: 11.5 }}>
+                {snapshot.ai.evaluationDatasets.length > 0
+                  ? snapshot.ai.evaluationDatasets.join(', ')
+                  : '— none generated'}
+              </dd>
+            </dl>
+            <p className="faint" style={{ fontSize: 11.5, marginTop: 10 }}>
+              No API keys, key lengths, or key fragments are ever reported here.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card__header">

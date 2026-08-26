@@ -125,6 +125,20 @@ export function buildHealthSnapshot(): SystemHealthSnapshot {
         message: 'Nightly similarity-index refresh completed (1,204 embeddings)',
       },
     ],
+    ai: {
+      analyzerMode: 'deterministic',
+      fallbackEnabled: true,
+      modelName: 'gemini-2.5-flash',
+      promptVersion: 'v1',
+      geminiStatus: 'unconfigured',
+      adkStatus: 'unconfigured',
+      deterministicStatus: 'healthy',
+      lastSuccessAt: ago(120),
+      lastErrorCode: null,
+      fallbackCount: 0,
+      historicalCorpusSize: 110,
+      evaluationDatasets: ['corpus.json', 'holdout.json', 'validation.json'],
+    },
     incident: {
       title: 'Pub/Sub latency',
       message:

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+backend/
+docs/
+.git/
+test-results/
+coverage/
+*.md
+.env
+.env.*
+!.env.example
+*.tar.gz

@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { api } from '../services';
+import type { ActionDecision } from '../services/apiTypes';
 import { useSettings } from './SettingsContext';
 import type { FailurePackage, Investigation } from '../types';
 
@@ -21,6 +22,7 @@ interface InvestigationsContextValue {
   fetchById: (id: string) => Promise<Investigation>;
   create: (pkg: FailurePackage) => Promise<string>;
   retry: (id: string) => Promise<Investigation>;
+  decide: (id: string, decision: ActionDecision) => Promise<Investigation>;
 }
 
 const InvestigationsContext = createContext<InvestigationsContextValue | null>(null);
@@ -104,6 +106,12 @@ export function InvestigationsProvider({ children }: { children: ReactNode }) {
     [refresh],
   );
 
+  const decide = useCallback(async (id: string, decision: ActionDecision) => {
+    const inv = await api.decideAction(id, decision);
+    setItems((prev) => prev.map((p) => (p.id === id ? inv : p)));
+    return inv;
+  }, []);
+
   return (
     <InvestigationsContext.Provider
       value={{
@@ -116,6 +124,7 @@ export function InvestigationsProvider({ children }: { children: ReactNode }) {
         fetchById,
         create,
         retry,
+        decide,
       }}
     >
       {children}

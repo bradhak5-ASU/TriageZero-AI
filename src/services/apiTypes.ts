@@ -9,6 +9,8 @@ export interface CreateInvestigationResponse {
   status: 'received';
 }
 
+export type ActionDecision = 'approve' | 'reject';
+
 // The contract both the real HTTP client and the mock client implement.
 export interface TriageZeroApi {
   getHealth(): Promise<SystemHealthSnapshot>;
@@ -16,6 +18,7 @@ export interface TriageZeroApi {
   getInvestigation(id: string): Promise<Investigation>;
   createInvestigation(pkg: FailurePackage): Promise<CreateInvestigationResponse>;
   retryInvestigation(id: string): Promise<Investigation>;
+  decideAction(id: string, decision: ActionDecision): Promise<Investigation>;
 }
 
 export class ApiError extends Error {

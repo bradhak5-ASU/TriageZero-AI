@@ -79,6 +79,57 @@ export interface SimilarFailure {
   date: string;
   resolution: string;
   issueRef?: string;
+  /** Names of the weighted signals that matched — shown so a reviewer can see why. */
+  matchingSignals?: string[];
+  isSynthetic?: boolean;
+}
+
+export type AnalysisProvider =
+  | 'deterministic'
+  | 'gemini'
+  | 'gemini_adk'
+  | 'deterministic_fallback';
+
+export interface StageSummary {
+  stage: string;
+  summary: string;
+  durationMs?: number;
+}
+
+/** Analysis provenance. Conclusions and metrics only — never prompts or reasoning. */
+export interface AiMetadata {
+  provider: AnalysisProvider;
+  modelName?: string | null;
+  promptVersion?: string | null;
+  analysisSchemaVersion?: string | null;
+  durationMs?: number | null;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  fallbackReason?: string | null;
+  usedFallback?: boolean;
+  requiresHumanReview?: boolean;
+  stageSummaries?: StageSummary[];
+  retrievalSignals?: string[];
+}
+
+export interface HumanResolution {
+  classification: Classification;
+  severity: Severity;
+  releaseRisk: ReleaseRisk;
+  resolutionSummary: string;
+  responsibleComponent?: string;
+  resolver?: string;
+  resolvedAt: string;
+  revision?: number;
+}
+
+export interface OriginalPrediction {
+  classification?: Classification | null;
+  confidence?: number | null;
+  severity?: Severity | null;
+  releaseRisk?: ReleaseRisk | null;
+  rootCauseSummary?: string | null;
+  provider?: string | null;
 }
 
 export interface RecommendedAction {
@@ -144,6 +195,11 @@ export interface Investigation {
   recommendedAction?: RecommendedAction;
   actionHistory: ActionRecord[];
   actionTaken?: string;
+  aiMetadata?: AiMetadata | null;
+  humanResolution?: HumanResolution | null;
+  originalPrediction?: OriginalPrediction | null;
+  /** Seeded benchmark row — labeled in the UI so it is never mistaken for real data. */
+  isSynthetic?: boolean;
 }
 
 export interface FailurePackage {
@@ -210,6 +266,28 @@ export interface SystemEvent {
   message: string;
 }
 
+export type AiProviderState =
+  | 'disabled'
+  | 'unconfigured'
+  | 'unverified'
+  | 'healthy'
+  | 'degraded';
+
+export interface AiHealth {
+  analyzerMode: string;
+  fallbackEnabled: boolean;
+  modelName: string;
+  promptVersion: string;
+  geminiStatus: AiProviderState;
+  adkStatus: AiProviderState;
+  deterministicStatus: ServiceStatus;
+  lastSuccessAt?: string | null;
+  lastErrorCode?: string | null;
+  fallbackCount: number;
+  historicalCorpusSize: number;
+  evaluationDatasets: string[];
+}
+
 export interface SystemHealthSnapshot {
   overall: ServiceStatus;
   services: ServiceHealth[];
@@ -219,6 +297,7 @@ export interface SystemHealthSnapshot {
   ingestionVolume: Array<{ label: string; count: number }>;
   events: SystemEvent[];
   incident?: { title: string; message: string; level: 'warn' | 'error' };
+  ai?: AiHealth;
 }
 
 export type ThemeName = 'dark' | 'light';

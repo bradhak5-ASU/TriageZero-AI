@@ -6,6 +6,18 @@ dist/
 dist-ssr/
 *.tsbuildinfo
 
+# backend
+backend/.venv/
+backend/data/
+
+# generated benchmark datasets, private oracle, and evaluation results
+backend/evaluation/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
 # environment — never commit real env files
 .env
 .env.local

@@ -5,13 +5,61 @@ import type {
   SystemHealthSnapshot,
 } from '../types';
 import { ApiError } from './apiTypes';
-import type { CreateInvestigationResponse, TriageZeroApi } from './apiTypes';
+import type {
+  ActionDecision,
+  CreateInvestigationResponse,
+  TriageZeroApi,
+} from './apiTypes';
 
 // Wire shape returned by the ingestion API for a created investigation.
 // The backend speaks `investigation_id`; the frontend uses `id` internally.
 interface CreateInvestigationWireResponse {
   investigation_id: string;
   status: 'received';
+}
+
+interface ApiErrorBody {
+  error?: {
+    code?: string;
+    message?: string;
+    details?: unknown;
+  };
+}
+
+// Surfaces the backend's own error message (and field-level details) so
+// validation failures are actionable instead of a bare status code.
+async function errorMessage(res: Response): Promise<string> {
+  const fallback = `API request failed: ${res.status} ${res.statusText}`;
+  try {
+    const body = (await res.json()) as ApiErrorBody;
+    const error = body.error;
+    if (!error?.message) return fallback;
+
+    const details = error.details;
+    if (Array.isArray(details)) {
+      const fields = details
+        .map((d) =>
+          typeof d === 'object' && d !== null && 'field' in d
+            ? String((d as { field: unknown }).field)
+            : null,
+        )
+        .filter(Boolean)
+        .slice(0, 5);
+      if (fields.length > 0) return `${error.message} (${fields.join(', ')})`;
+    }
+    if (
+      details &&
+      typeof details === 'object' &&
+      'forbidden_fields' in details &&
+      Array.isArray((details as { forbidden_fields: unknown[] }).forbidden_fields)
+    ) {
+      const forbidden = (details as { forbidden_fields: string[] }).forbidden_fields;
+      return `${error.message} (${forbidden.slice(0, 5).join(', ')})`;
+    }
+    return error.message;
+  } catch {
+    return fallback;
+  }
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -25,7 +73,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(`Could not reach TriageZero API at ${config.apiBaseUrl}`);
   }
   if (!res.ok) {
-    throw new ApiError(`API request failed: ${res.status} ${res.statusText}`, res.status);
+    throw new ApiError(await errorMessage(res), res.status);
   }
   return (await res.json()) as T;
 }
@@ -49,6 +97,13 @@ export const httpApi: TriageZeroApi = {
   retryInvestigation: (id: string) =>
     request<Investigation>(
       `/api/v1/investigations/${encodeURIComponent(id)}/retry`,
+      { method: 'POST' },
+    ),
+
+  // records the decision server-side; the backend never executes external actions
+  decideAction: (id: string, decision: ActionDecision) =>
+    request<Investigation>(
+      `/api/v1/investigations/${encodeURIComponent(id)}/actions/${decision}`,
       { method: 'POST' },
     ),
 };

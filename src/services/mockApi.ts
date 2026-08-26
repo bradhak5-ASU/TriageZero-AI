@@ -1,6 +1,7 @@
 import { buildHealthSnapshot } from '../data/mockHealth';
 import { mockInvestigations } from '../data/mockInvestigations';
 import type {
+  ApprovalState,
   ArtifactInfo,
   Classification,
   FailurePackage,
@@ -12,10 +13,15 @@ import type {
   TimelineEvent,
 } from '../types';
 import { ApiError } from './apiTypes';
-import type { CreateInvestigationResponse, TriageZeroApi } from './apiTypes';
+import type {
+  ActionDecision,
+  CreateInvestigationResponse,
+  TriageZeroApi,
+} from './apiTypes';
 
 const CREATED_KEY = 'triagezero.created.v1';
 const RETRY_KEY = 'triagezero.retries.v1';
+const DECISION_KEY = 'triagezero.decisions.v1';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const latency = () => sleep(200 + Math.random() * 250);
@@ -274,6 +280,26 @@ function materialize(stored: StoredCreated): Investigation {
         note: 'Demo mode — actions are simulated and never executed externally',
       },
     ];
+    inv.aiMetadata = {
+      provider: 'deterministic',
+      modelName: null,
+      promptVersion: 'v1',
+      analysisSchemaVersion: '1.0',
+      durationMs: 45,
+      inputTokens: null,
+      outputTokens: null,
+      fallbackReason: null,
+      usedFallback: false,
+      requiresHumanReview: analysis.confidence < 0.6,
+      stageSummaries: [
+        {
+          stage: 'deterministic_rules',
+          summary: `Matched evidence rules → ${analysis.classification} (confidence ${analysis.confidence.toFixed(2)}).`,
+          durationMs: 45,
+        },
+      ],
+      retrievalSignals: [],
+    };
     inv.similarFailures = [
       {
         id: 'INV-1893',
@@ -300,10 +326,44 @@ function applyRetry(inv: Investigation): Investigation {
   return { ...inv, status, stage };
 }
 
+interface StoredDecision {
+  state: ApprovalState;
+  at: string;
+}
+
+function applyDecision(inv: Investigation): Investigation {
+  const decisions = readJson<Record<string, StoredDecision>>(DECISION_KEY, {});
+  const decision = decisions[inv.id];
+  if (!decision || !inv.recommendedAction) return inv;
+  return {
+    ...inv,
+    recommendedAction: { ...inv.recommendedAction, approvalState: decision.state },
+    actionTaken:
+      decision.state === 'approved'
+        ? 'Approved — simulated locally in demo mode'
+        : 'Recommendation rejected (demo mode)',
+    actionHistory: [
+      ...inv.actionHistory,
+      {
+        id: `local-${decision.at}`,
+        at: decision.at,
+        actor: 'you (demo)',
+        action:
+          decision.state === 'approved'
+            ? 'Approved recommended action'
+            : 'Rejected recommended action',
+        state: decision.state,
+        note: 'Recorded locally — demo mode never executes external actions',
+      },
+    ],
+  };
+}
+
 function allInvestigations(): Investigation[] {
   const created = readJson<StoredCreated[]>(CREATED_KEY, []).map(materialize);
   return [...created, ...mockInvestigations]
     .map(applyRetry)
+    .map(applyDecision)
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
@@ -349,5 +409,21 @@ export const mockApi: TriageZeroApi = {
     retries[id] = new Date().toISOString();
     writeJson(RETRY_KEY, retries);
     return applyRetry(inv);
+  },
+
+  async decideAction(id: string, decision: ActionDecision) {
+    await latency();
+    const inv = allInvestigations().find((i) => i.id === id);
+    if (!inv) throw new ApiError(`Investigation ${id} not found`, 404);
+    if (!inv.recommendedAction) {
+      throw new ApiError(`Investigation ${id} has no recommended action`, 409);
+    }
+    const decisions = readJson<Record<string, StoredDecision>>(DECISION_KEY, {});
+    decisions[id] = {
+      state: decision === 'approve' ? 'approved' : 'rejected',
+      at: new Date().toISOString(),
+    };
+    writeJson(DECISION_KEY, decisions);
+    return applyDecision(inv);
   },
 };
