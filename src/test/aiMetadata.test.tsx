@@ -10,7 +10,7 @@ import type { AiMetadata, HumanResolution, OriginalPrediction } from '../types';
 
 const fullMeta: AiMetadata = {
   provider: 'gemini_adk',
-  modelName: 'gemini-2.5-flash',
+  modelName: 'gemini-3.6-flash',
   promptVersion: 'v1',
   analysisSchemaVersion: '1.0',
   durationMs: 2400,
@@ -31,7 +31,7 @@ describe('AI provenance panel', () => {
     render(<AnalysisProvenanceCard meta={fullMeta} />);
     // appears both as the header badge and in the details list
     expect(screen.getAllByText('Gemini + Google ADK').length).toBeGreaterThan(0);
-    expect(screen.getByText('gemini-2.5-flash')).toBeInTheDocument();
+    expect(screen.getByText('gemini-3.6-flash')).toBeInTheDocument();
     expect(screen.getByText('v1')).toBeInTheDocument();
     expect(screen.getByText('1.0')).toBeInTheDocument();
     expect(screen.getByText(/2\.4s/)).toBeInTheDocument();

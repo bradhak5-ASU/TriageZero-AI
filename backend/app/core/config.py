@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     ai_prompt_version: str = "v1"
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.6-flash"
     gemini_request_timeout_seconds: int = 30
     gemini_max_retries: int = 2
 

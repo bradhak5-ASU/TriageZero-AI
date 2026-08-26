@@ -128,7 +128,7 @@ export function buildHealthSnapshot(): SystemHealthSnapshot {
     ai: {
       analyzerMode: 'deterministic',
       fallbackEnabled: true,
-      modelName: 'gemini-2.5-flash',
+      modelName: 'gemini-3.6-flash',
       promptVersion: 'v1',
       geminiStatus: 'unconfigured',
       adkStatus: 'unconfigured',

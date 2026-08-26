@@ -157,6 +157,13 @@ def _advance(investigation_id: str, step_index: int) -> bool:
 
         if stage == "action_recommendation":
             needs_review = bool(doc.get("aiMetadata", {}).get("requiresHumanReview"))
+            provider = str(doc.get("aiMetadata", {}).get("provider") or "unknown")
+            provider_label = {
+                "deterministic": "Deterministic",
+                "deterministic_fallback": "Deterministic fallback",
+                "gemini": "Gemini",
+                "gemini_adk": "Gemini ADK",
+            }.get(provider, "TriageZero")
             record.status = "needs_review" if needs_review else "completed"
             record.completed_at = now_iso()
             elapsed = _elapsed_ms(record.created_at, record.completed_at)
@@ -173,7 +180,7 @@ def _advance(investigation_id: str, step_index: int) -> bool:
                     "actor": "TriageZero analyzer",
                     "action": "Proposed recommended action",
                     "state": "awaiting_approval",
-                    "note": "Deterministic local analysis — actions require human approval",
+                    "note": f"{provider_label} analysis — actions require human approval",
                 }
             )
             log_event(

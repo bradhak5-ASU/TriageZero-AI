@@ -139,7 +139,13 @@ class GeminiAnalyzer(Analyzer):
         return types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
             response_mime_type="application/json",
-            response_schema=ModelAnalysis,
+            # Use the JSON Schema wire field directly. Passing the Pydantic
+            # model through ``response_schema`` makes google-genai translate
+            # ``additionalProperties: false`` into an unsupported proto field
+            # (``additional_properties``) for the Developer API. We still
+            # validate the returned payload against the strict Pydantic model
+            # below, so unknown output fields remain forbidden.
+            response_json_schema=ModelAnalysis.model_json_schema(),
             temperature=0.0,
             candidate_count=1,
             # deliberately no tools / no function declarations

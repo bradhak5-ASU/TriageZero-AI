@@ -40,7 +40,7 @@ def settings_for(**overrides) -> Settings:
         "analyzer_mode": "deterministic",
         "ai_fallback_enabled": True,
         "gemini_api_key": "",
-        "gemini_model": "gemini-2.5-flash",
+        "gemini_model": "gemini-3.6-flash",
     }
     return Settings(**{**base, **overrides})
 
@@ -66,14 +66,14 @@ def test_no_provider_client_is_constructed_at_import_time():
     import app.ai.gemini as gemini_module
 
     importlib.reload(gemini_module)
-    analyzer = gemini_module.GeminiAnalyzer(api_key=None, model="gemini-2.5-flash")
+    analyzer = gemini_module.GeminiAnalyzer(api_key=None, model="gemini-3.6-flash")
     assert analyzer._client is None  # nothing built until analyze() runs
 
 
 def test_constructing_gemini_analyzer_does_not_dial(pkg):
     from app.ai.gemini import GeminiAnalyzer
 
-    analyzer = GeminiAnalyzer(api_key=None, model="gemini-2.5-flash")
+    analyzer = GeminiAnalyzer(api_key=None, model="gemini-3.6-flash")
     # no credentials → a safe AnalyzerError, never a network attempt
     with pytest.raises(AnalyzerError) as exc:
         analyzer.analyze(pkg, [], AnalysisContext())
@@ -91,12 +91,32 @@ def test_gemini_mode_returns_validated_result(pkg):
     result = run_analysis(pkg, [], AnalysisContext(), settings=s)
 
     assert result.provider == "gemini"
-    assert result.model_name == "gemini-2.5-flash"
+    assert result.model_name == "gemini-3.6-flash"
     assert result.analysis.classification == "backend_application_defect"
     assert result.input_tokens == 1234
     assert result.output_tokens == 321
     assert result.fallback_reason is None
     assert client.calls, "the fake client should have been called"
+
+
+def test_gemini_uses_json_schema_wire_field(pkg):
+    """The Developer API rejects Pydantic ``additionalProperties`` when the
+    SDK translates it through the legacy response_schema proto field."""
+    from app.ai.gemini import GeminiAnalyzer
+    from app.ai.schemas import ModelAnalysis
+
+    client = FakeGeminiClient()
+    analyzer = GeminiAnalyzer(
+        api_key="placeholder",
+        model="gemini-3.6-flash",
+        client_factory=lambda: client,
+    )
+
+    analyzer.analyze(pkg, [], AnalysisContext())
+
+    config = client.calls[-1]["config"]
+    assert config.response_schema is None
+    assert config.response_json_schema == ModelAnalysis.model_json_schema()
 
 
 def test_missing_credentials_falls_back_when_enabled(pkg):
@@ -357,3 +377,19 @@ def test_provider_metadata_is_persisted(client, sample_package):
     blob = str(inv).lower()
     assert "chain_of_thought" not in blob
     assert "BEGIN_UNTRUSTED_EVIDENCE".lower() not in blob
+
+
+def test_gemini_action_history_names_the_real_provider(make_client, sample_package):
+    client_provider = FakeGeminiClient()
+    set_gemini_client_factory(lambda: client_provider)
+    client = make_client(ANALYZER_MODE="gemini", GEMINI_API_KEY="placeholder")
+
+    inv_id = client.post("/api/v1/investigations", json=sample_package).json()[
+        "investigation_id"
+    ]
+    inv = client.get(f"/api/v1/investigations/{inv_id}").json()
+
+    assert inv["aiMetadata"]["provider"] == "gemini"
+    assert inv["actionHistory"][-1]["note"] == (
+        "Gemini analysis — actions require human approval"
+    )
