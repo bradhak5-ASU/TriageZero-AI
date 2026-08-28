@@ -36,7 +36,7 @@ class Settings(BaseSettings):
 
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.6-flash"
-    gemini_request_timeout_seconds: int = 30
+    gemini_request_timeout_seconds: int = 60
     gemini_max_retries: int = 2
 
     google_genai_use_vertexai: bool = False

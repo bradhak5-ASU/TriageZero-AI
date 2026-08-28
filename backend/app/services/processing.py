@@ -129,6 +129,10 @@ def _apply_analysis(record, doc: dict, result: AnalysisResult) -> None:
         "usedFallback": result.provider == "deterministic_fallback",
         "requiresHumanReview": result.needs_review(),
         "stageSummaries": [s.model_dump() for s in result.stage_summaries],
+        "providerError": (
+            result.provider_error.model_dump() if result.provider_error is not None else None
+        ),
+        "providerAttempts": [attempt.model_dump() for attempt in result.provider_attempts],
         "retrievalSignals": list(result.retrieval_signals),
     }
 

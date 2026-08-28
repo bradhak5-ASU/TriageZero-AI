@@ -13,6 +13,7 @@ from typing import Any
 from app.ai.deterministic import DeterministicAnalyzer, classify
 from app.ai.protocols import Analyzer, AnalyzerError
 from app.ai.schemas import AnalysisContext, AnalysisResult, StageSummary
+from app.ai.schemas import ProviderError
 from app.ai.telemetry import telemetry
 from app.core.config import Settings, get_settings
 from app.core.logging import log_event
@@ -99,17 +100,26 @@ def _fallback_result(
     similar_cases: list[dict[str, Any]],
     context: AnalysisContext,
     reason: str,
+    provider_error: ProviderError | None = None,
 ) -> AnalysisResult:
     """Deterministic analysis, honestly labeled as a fallback."""
     result = DeterministicAnalyzer(provider_label="deterministic_fallback").analyze(
         pkg, similar_cases, context
     )
     telemetry.record_fallback()
-    return result.model_copy(update={"fallback_reason": reason})
+    updates: dict[str, Any] = {"fallback_reason": reason}
+    if provider_error is not None:
+        updates["provider_error"] = provider_error
+        updates["provider_attempts"] = provider_error.attempts
+    return result.model_copy(update=updates)
 
 
 def _conservative_failure(
-    pkg: FailurePackage, context: AnalysisContext, reason: str
+    pkg: FailurePackage,
+    context: AnalysisContext,
+    reason: str,
+    provider_label: str,
+    provider_error: ProviderError | None = None,
 ) -> AnalysisResult:
     """Fallback disabled: return a needs-review result, never a fake verdict."""
     analysis = classify(pkg).model_copy(
@@ -132,13 +142,24 @@ def _conservative_failure(
     )
     return AnalysisResult(
         analysis=analysis,
-        provider="deterministic_fallback",
+        provider=provider_label,  # type: ignore[arg-type]
         prompt_version=context.prompt_version,
         stage_summaries=[
             StageSummary(stage="analysis_unavailable", summary=f"Provider error: {reason}.")
         ],
         fallback_reason=reason,
+        provider_error=provider_error,
+        provider_attempts=list(provider_error.attempts) if provider_error else [],
     )
+
+
+def _provider_error_from_details(details: dict[str, Any]) -> ProviderError | None:
+    if not details:
+        return None
+    try:
+        return ProviderError.model_validate(details)
+    except Exception:  # noqa: BLE001 - provider details are best-effort telemetry
+        return None
 
 
 def run_analysis(
@@ -165,7 +186,7 @@ def run_analysis(
         telemetry.record_error(reason)
         if s.ai_fallback_enabled:
             return _fallback_result(failure_package, cases, ctx, reason)
-        return _conservative_failure(failure_package, ctx, reason)
+        return _conservative_failure(failure_package, ctx, reason, mode)
 
     try:
         result = provider.analyze(failure_package, cases, ctx)
@@ -173,19 +194,23 @@ def run_analysis(
         return result
     except AnalyzerError as exc:
         telemetry.record_error(exc.code)
+        provider_error = _provider_error_from_details(exc.details)
         log_event(
             "ai provider error",
             mode=mode,
             error_code=exc.code,  # safe slug only
+            error_category=provider_error.error_category if provider_error else None,
+            http_status=provider_error.http_status if provider_error else None,
+            attempt_count=provider_error.attempt_count if provider_error else None,
             fallback=s.ai_fallback_enabled,
             duration_ms=int((time.perf_counter() - started) * 1000),
         )
         if s.ai_fallback_enabled:
-            return _fallback_result(failure_package, cases, ctx, exc.code)
-        return _conservative_failure(failure_package, ctx, exc.code)
+            return _fallback_result(failure_package, cases, ctx, exc.code, provider_error)
+        return _conservative_failure(failure_package, ctx, exc.code, mode, provider_error)
     except Exception:  # noqa: BLE001 - a model failure must never break ingestion
         telemetry.record_error("unexpected_error")
         log_event("ai provider crashed", mode=mode, error_code="unexpected_error")
         if s.ai_fallback_enabled:
             return _fallback_result(failure_package, cases, ctx, "unexpected_error")
-        return _conservative_failure(failure_package, ctx, "unexpected_error")
+        return _conservative_failure(failure_package, ctx, "unexpected_error", mode)

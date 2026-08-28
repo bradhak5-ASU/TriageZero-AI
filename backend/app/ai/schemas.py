@@ -87,6 +87,32 @@ class StageSummary(BaseModel):
     duration_ms: int = Field(default=0, ge=0)
 
 
+class ProviderAttempt(BaseModel):
+    """Safe provider call telemetry. No prompts, payloads, or credentials."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    attempt: int = Field(ge=1)
+    duration_ms: int = Field(default=0, ge=0)
+    outcome: str = Field(max_length=80)
+    error_category: str | None = Field(default=None, max_length=80)
+    http_status: int | None = None
+
+
+class ProviderError(BaseModel):
+    """Sanitized provider failure metadata safe to persist and display."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    error_code: str = Field(max_length=80)
+    error_category: str = Field(max_length=80)
+    http_status: int | None = None
+    attempt_count: int = Field(default=0, ge=0)
+    last_attempt_duration_ms: int | None = Field(default=None, ge=0)
+    provider_message_sanitized: str = Field(default="", max_length=300)
+    attempts: list[ProviderAttempt] = Field(default_factory=list, max_length=10)
+
+
 class AnalysisResult(BaseModel):
     """Validated conclusions plus application-controlled provenance."""
 
@@ -103,6 +129,8 @@ class AnalysisResult(BaseModel):
     input_tokens: int | None = None
     output_tokens: int | None = None
     fallback_reason: str | None = Field(default=None, max_length=MAX_SHORT)
+    provider_error: ProviderError | None = None
+    provider_attempts: list[ProviderAttempt] = Field(default_factory=list, max_length=10)
     retrieval_signals: list[str] = Field(default_factory=list, max_length=20)
 
     # convenience passthroughs used by the persistence layer

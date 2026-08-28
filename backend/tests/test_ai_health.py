@@ -77,17 +77,17 @@ def test_health_reports_fallback_count_after_a_fallback(make_client, sample_pack
 
 def test_unconfigured_gemini_mode_still_produces_investigations(make_client, sample_package):
     """The app must work end to end with no credentials at all."""
-    client = make_client(ANALYZER_MODE="gemini", GEMINI_API_KEY="")
+    client = make_client(ANALYZER_MODE="gemini", AI_FALLBACK_ENABLED="false", GEMINI_API_KEY="")
     inv_id = client.post("/api/v1/investigations", json=sample_package).json()["investigation_id"]
     inv = client.get(f"/api/v1/investigations/{inv_id}").json()
 
-    assert inv["status"] in ("completed", "needs_review")
+    assert inv["status"] == "needs_review"
     meta = inv["aiMetadata"]
-    assert meta["provider"] == "deterministic_fallback"
-    assert meta["usedFallback"] is True
+    assert meta["provider"] == "gemini"
+    assert meta["usedFallback"] is False
     assert meta["fallbackReason"] == "unconfigured"
-    # never pretends Gemini ran
-    assert meta["provider"] != "gemini"
+    # never claims deterministic fallback ran when fallback is disabled
+    assert meta["provider"] != "deterministic_fallback"
 
 
 def test_health_reports_corpus_size_and_datasets(client):

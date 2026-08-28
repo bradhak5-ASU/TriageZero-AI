@@ -33,7 +33,15 @@ class AnalyzerError(Exception):
     credentials, prompt contents, or evidence.
     """
 
-    def __init__(self, code: str, message: str = "", *, retryable: bool = False) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str = "",
+        *,
+        retryable: bool = False,
+        details: dict[str, Any] | None = None,
+    ) -> None:
         super().__init__(message or code)
         self.code = code
         self.retryable = retryable
+        self.details = details or {}

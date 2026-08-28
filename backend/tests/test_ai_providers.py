@@ -45,6 +45,12 @@ def settings_for(**overrides) -> Settings:
     return Settings(**{**base, **overrides})
 
 
+class FakeProviderHttpError(RuntimeError):
+    def __init__(self, status_code: int, message: str) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
 # --- defaults and construction -------------------------------------------
 
 
@@ -96,6 +102,7 @@ def test_gemini_mode_returns_validated_result(pkg):
     assert result.input_tokens == 1234
     assert result.output_tokens == 321
     assert result.fallback_reason is None
+    assert result.needs_review() is False
     assert client.calls, "the fake client should have been called"
 
 
@@ -131,7 +138,7 @@ def test_missing_credentials_falls_back_when_enabled(pkg):
 def test_missing_credentials_without_fallback_marks_needs_review(pkg):
     s = settings_for(analyzer_mode="gemini", ai_fallback_enabled=False)
     result = run_analysis(pkg, [], AnalysisContext(), settings=s)
-    assert result.provider == "deterministic_fallback"
+    assert result.provider == "gemini"
     assert result.analysis.classification == "unknown"
     assert result.analysis.requires_human_review is True
     assert result.needs_review() is True
@@ -160,6 +167,11 @@ def test_transient_error_is_retried_then_succeeds(pkg):
 
     assert result.provider == "gemini"
     assert len(client.calls) == 2  # one failure, one retry
+    assert [attempt.outcome for attempt in result.provider_attempts] == [
+        "retryable_error",
+        "success",
+    ]
+    assert result.provider_attempts[0].error_category == "http_503"
 
 
 def test_permanent_error_is_not_retried(pkg):
@@ -172,6 +184,9 @@ def test_permanent_error_is_not_retried(pkg):
     assert len(client.calls) == 1  # auth errors must not spin
     assert result.provider == "deterministic_fallback"
     assert result.fallback_reason == "auth_error"
+    assert result.provider_error is not None
+    assert result.provider_error.error_category == "auth_error"
+    assert result.provider_error.attempt_count == 1
 
 
 def test_retries_are_bounded(pkg):
@@ -183,6 +198,8 @@ def test_retries_are_bounded(pkg):
 
     assert len(client.calls) == 3  # initial + 2 retries, then stop
     assert result.provider == "deterministic_fallback"
+    assert result.provider_error is not None
+    assert result.provider_error.attempt_count == 3
 
 
 def test_timeout_error_falls_back_safely(pkg):
@@ -191,7 +208,110 @@ def test_timeout_error_falls_back_safely(pkg):
     s = settings_for(analyzer_mode="gemini")
     result = run_analysis(pkg, [], AnalysisContext(), settings=s)
     assert result.provider == "deterministic_fallback"
-    assert result.fallback_reason == "transient_error"
+    assert result.fallback_reason == "timeout"
+    assert result.provider_error is not None
+    assert result.provider_error.error_category == "timeout"
+
+
+def test_gemini_failure_without_fallback_keeps_attempted_provider(pkg):
+    client = FakeGeminiClient(raise_times=99, error=TimeoutError("deadline exceeded"))
+    set_gemini_client_factory(lambda: client)
+    s = settings_for(analyzer_mode="gemini", ai_fallback_enabled=False)
+
+    result = run_analysis(pkg, [], AnalysisContext(), settings=s)
+
+    assert result.provider == "gemini"
+    assert result.fallback_reason == "timeout"
+    assert result.analysis.classification == "unknown"
+    assert result.analysis.requires_human_review is True
+    assert len(client.calls) == 3
+    assert result.provider_error is not None
+    assert result.provider_error.error_category == "timeout"
+    assert result.provider_error.attempt_count == 3
+
+
+def test_gemini_failure_with_fallback_runs_deterministic_analyzer(pkg):
+    client = FakeGeminiClient(raise_times=99, error=TimeoutError("deadline exceeded"))
+    set_gemini_client_factory(lambda: client)
+    s = settings_for(analyzer_mode="gemini", ai_fallback_enabled=True)
+
+    result = run_analysis(pkg, [], AnalysisContext(), settings=s)
+
+    assert result.provider == "deterministic_fallback"
+    assert result.fallback_reason == "timeout"
+    assert result.analysis.classification == "backend_application_defect"
+    assert result.analysis.confidence > 0
+    assert len(client.calls) == 3
+    assert result.provider_error is not None
+    assert result.provider_error.error_category == "timeout"
+
+
+@pytest.mark.parametrize(
+    "error,expected_code,expected_category,expected_status",
+    [
+        (TimeoutError("deadline exceeded"), "timeout", "timeout", None),
+        (FakeProviderHttpError(429, "rate limit"), "rate_limit", "rate_limit", 429),
+        (FakeProviderHttpError(503, "service unavailable"), "http_error", "http_503", 503),
+        (ConnectionError("connection reset by peer"), "connection_error", "connection_reset", None),
+    ],
+)
+def test_retryable_provider_errors_record_attempts(
+    pkg, error, expected_code, expected_category, expected_status
+):
+    client = FakeGeminiClient(raise_times=99, error=error)
+    set_gemini_client_factory(lambda: client)
+    s = settings_for(
+        analyzer_mode="gemini",
+        ai_fallback_enabled=False,
+        gemini_max_retries=2,
+    )
+
+    result = run_analysis(pkg, [], AnalysisContext(), settings=s)
+
+    assert len(client.calls) == 3
+    assert result.provider == "gemini"
+    assert result.fallback_reason == expected_code
+    assert result.provider_error is not None
+    assert result.provider_error.error_code == expected_code
+    assert result.provider_error.error_category == expected_category
+    assert result.provider_error.http_status == expected_status
+    assert result.provider_error.attempt_count == 3
+    assert [attempt.attempt for attempt in result.provider_error.attempts] == [1, 2, 3]
+    assert all(attempt.outcome == "retryable_error" for attempt in result.provider_error.attempts)
+
+
+def test_permanent_auth_style_error_records_no_retry(pkg):
+    client = FakeGeminiClient(
+        raise_times=99,
+        error=FakeProviderHttpError(401, "authentication failed"),
+    )
+    set_gemini_client_factory(lambda: client)
+    s = settings_for(analyzer_mode="gemini", ai_fallback_enabled=False)
+
+    result = run_analysis(pkg, [], AnalysisContext(), settings=s)
+
+    assert len(client.calls) == 1
+    assert result.provider == "gemini"
+    assert result.fallback_reason == "auth_error"
+    assert result.provider_error is not None
+    assert result.provider_error.error_category == "auth_error"
+    assert result.provider_error.http_status == 401
+    assert result.provider_error.attempt_count == 1
+
+
+def test_success_after_transient_retry_records_attempt_timeline(pkg):
+    client = FakeGeminiClient(raise_times=1, error=FakeProviderHttpError(500, "server error"))
+    set_gemini_client_factory(lambda: client)
+    s = settings_for(analyzer_mode="gemini", ai_fallback_enabled=False)
+
+    result = run_analysis(pkg, [], AnalysisContext(), settings=s)
+
+    assert result.provider == "gemini"
+    assert result.fallback_reason is None
+    assert result.provider_error is None
+    assert len(result.provider_attempts) == 2
+    assert result.provider_attempts[0].error_category == "http_500"
+    assert result.provider_attempts[1].outcome == "success"
 
 
 # --- output validation -----------------------------------------------------

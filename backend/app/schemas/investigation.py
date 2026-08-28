@@ -118,6 +118,24 @@ class StageSummaryOut(CamelModel):
     duration_ms: int = 0
 
 
+class ProviderAttemptOut(CamelModel):
+    attempt: int
+    duration_ms: int = 0
+    outcome: str
+    error_category: str | None = None
+    http_status: int | None = None
+
+
+class ProviderErrorOut(CamelModel):
+    error_code: str
+    error_category: str
+    http_status: int | None = None
+    attempt_count: int = 0
+    last_attempt_duration_ms: int | None = None
+    provider_message_sanitized: str = ""
+    attempts: list[ProviderAttemptOut] = Field(default_factory=list)
+
+
 class AiMetadataOut(CamelModel):
     """Analysis provenance. Conclusions and metrics only — never prompts,
     raw model responses, or reasoning."""
@@ -133,6 +151,8 @@ class AiMetadataOut(CamelModel):
     used_fallback: bool = False
     requires_human_review: bool = False
     stage_summaries: list[StageSummaryOut] = Field(default_factory=list)
+    provider_error: ProviderErrorOut | None = None
+    provider_attempts: list[ProviderAttemptOut] = Field(default_factory=list)
     retrieval_signals: list[str] = Field(default_factory=list)
 
 

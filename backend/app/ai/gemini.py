@@ -26,6 +26,8 @@ from app.ai.schemas import (
     AnalysisContext,
     AnalysisResult,
     ModelAnalysis,
+    ProviderAttempt,
+    ProviderError,
     StageSummary,
 )
 from app.core.logging import log_event
@@ -46,8 +48,39 @@ _RETRYABLE_MARKERS = (
     "temporarily",
 )
 
+_MESSAGE_LIMIT = 240
 
-def _classify_error(exc: Exception) -> tuple[str, bool]:
+
+def _extract_http_status(exc: Exception) -> int | None:
+    for attr in ("status_code", "status", "code"):
+        value = getattr(exc, attr, None)
+        if isinstance(value, int) and 100 <= value <= 599:
+            return value
+    response = getattr(exc, "response", None)
+    value = getattr(response, "status_code", None)
+    if isinstance(value, int) and 100 <= value <= 599:
+        return value
+    text = f"{type(exc).__name__}: {exc}".lower()
+    for status in (429, 500, 502, 503, 401, 403, 404, 400):
+        if str(status) in text:
+            return status
+    return None
+
+
+def _sanitize_provider_message(exc: Exception) -> str:
+    text = f"{type(exc).__name__}: {exc}"
+    redactions = ("api_key", "apikey", "authorization", "bearer", "token", "credential", "cookie")
+    parts = []
+    for token in text.replace("\n", " ").split():
+        lowered = token.lower()
+        if any(marker in lowered for marker in redactions):
+            parts.append("[REDACTED]")
+        else:
+            parts.append(token)
+    return " ".join(parts)[:_MESSAGE_LIMIT]
+
+
+def _classify_error(exc: Exception) -> tuple[str, str, int | None, bool, str]:
     """Map a provider exception to a SAFE code and whether to retry.
 
     Only the exception's type name and lowercase markers are inspected — the
@@ -55,13 +88,48 @@ def _classify_error(exc: Exception) -> tuple[str, bool]:
     request contents.
     """
     text = f"{type(exc).__name__}: {exc}".lower()
+    status = _extract_http_status(exc)
+    safe_message = _sanitize_provider_message(exc)
+    if status in (401, 403):
+        return "auth_error", "auth_error", status, False, safe_message
+    if status == 429:
+        return "rate_limit", "rate_limit", status, True, safe_message
+    if status in (500, 502, 503):
+        return "http_error", f"http_{status}", status, True, safe_message
+    if status is not None and 400 <= status < 500:
+        return "invalid_request", f"http_{status}", status, False, safe_message
     if any(marker in text for marker in ("permission", "unauthenticated", "api key", "credential")):
-        return "auth_error", False
+        return "auth_error", "auth_error", status, False, safe_message
+    if "deadline" in text or "timeout" in text or isinstance(exc, TimeoutError):
+        return "timeout", "timeout", status, True, safe_message
+    if "connection reset" in text:
+        return "connection_error", "connection_reset", status, True, safe_message
+    if any(marker in text for marker in ("dns", "name resolution", "temporary failure", "connection error")):
+        return "connection_error", "connection_error", status, True, safe_message
     if any(marker in text for marker in _RETRYABLE_MARKERS):
-        return "transient_error", True
+        return "transient_error", "sdk_transport_error", status, True, safe_message
     if "invalid" in text or "argument" in text:
-        return "invalid_request", False
-    return "provider_error", False
+        return "invalid_request", "invalid_request", status, False, safe_message
+    return "provider_error", "unknown_provider_error", status, False, safe_message
+
+
+def _provider_error(
+    *,
+    code: str,
+    category: str,
+    http_status: int | None,
+    message: str,
+    attempts: list[ProviderAttempt],
+) -> ProviderError:
+    return ProviderError(
+        error_code=code,
+        error_category=category,
+        http_status=http_status,
+        attempt_count=len(attempts),
+        last_attempt_duration_ms=attempts[-1].duration_ms if attempts else None,
+        provider_message_sanitized=message,
+        attempts=attempts,
+    )
 
 
 class GeminiAnalyzer(Analyzer):
@@ -94,6 +162,7 @@ class GeminiAnalyzer(Analyzer):
         self._client_factory = client_factory
         self._client: Any | None = None
         self._label = provider_label
+        self._last_attempts: list[ProviderAttempt] = []
 
     # -- client ---------------------------------------------------------
 
@@ -177,23 +246,65 @@ class GeminiAnalyzer(Analyzer):
     def _call_model(self, prompt: str) -> Any:
         client = self._get_client()
         last: Exception | None = None
+        attempts: list[ProviderAttempt] = []
         for attempt in range(self._max_retries + 1):
+            attempt_started = time.perf_counter()
             try:
-                return client.models.generate_content(
+                response = client.models.generate_content(
                     model=self._model,
                     contents=prompt,
                     config=self._config(),
                 )
+                attempts.append(
+                    ProviderAttempt(
+                        attempt=attempt + 1,
+                        duration_ms=int((time.perf_counter() - attempt_started) * 1000),
+                        outcome="success",
+                    )
+                )
+                self._last_attempts = list(attempts)
+                return response
             except AnalyzerError:
                 raise
             except Exception as exc:  # noqa: BLE001 - mapped to a safe code below
-                code, retryable = _classify_error(exc)
+                code, category, http_status, retryable, safe_message = _classify_error(exc)
+                attempts.append(
+                    ProviderAttempt(
+                        attempt=attempt + 1,
+                        duration_ms=int((time.perf_counter() - attempt_started) * 1000),
+                        outcome="retryable_error" if retryable else "permanent_error",
+                        error_category=category,
+                        http_status=http_status,
+                    )
+                )
                 last = exc
                 if not retryable or attempt == self._max_retries:
-                    raise AnalyzerError(code, "Gemini request failed", retryable=retryable) from exc
+                    self._last_attempts = list(attempts)
+                    raise AnalyzerError(
+                        code,
+                        "Gemini request failed",
+                        retryable=retryable,
+                        details=_provider_error(
+                            code=code,
+                            category=category,
+                            http_status=http_status,
+                            message=safe_message,
+                            attempts=attempts,
+                        ).model_dump(),
+                    ) from exc
                 # exponential backoff, transient failures only
                 time.sleep(min(2**attempt * 0.5, 4.0))
-        raise AnalyzerError("provider_error", "Gemini request failed") from last
+        raise AnalyzerError(
+            "provider_error",
+            "Gemini request failed",
+            details=_provider_error(
+                code="provider_error",
+                category="unknown_provider_error",
+                http_status=None,
+                message=_sanitize_provider_message(last) if last else "",
+                attempts=attempts,
+            ).model_dump(),
+        ) from last
 
     # -- analyzer protocol ----------------------------------------------
 
@@ -212,9 +323,27 @@ class GeminiAnalyzer(Analyzer):
         try:
             payload = json.loads(raw) if isinstance(raw, str) else raw
         except json.JSONDecodeError as exc:
-            raise AnalyzerError("invalid_json", "Model response was not valid JSON") from exc
+            raise AnalyzerError(
+                "invalid_json",
+                "Model response was not valid JSON",
+                details=ProviderError(
+                    error_code="invalid_json",
+                    error_category="malformed_provider_response",
+                    attempt_count=1,
+                    provider_message_sanitized="Model response was not valid JSON",
+                ).model_dump(),
+            ) from exc
         if not isinstance(payload, dict):
-            raise AnalyzerError("invalid_json", "Model response was not a JSON object")
+            raise AnalyzerError(
+                "invalid_json",
+                "Model response was not a JSON object",
+                details=ProviderError(
+                    error_code="invalid_json",
+                    error_category="malformed_provider_response",
+                    attempt_count=1,
+                    provider_message_sanitized="Model response was not a JSON object",
+                ).model_dump(),
+            )
 
         try:
             # closed schema: unknown fields (including any smuggled reasoning)
@@ -226,7 +355,16 @@ class GeminiAnalyzer(Analyzer):
                 error_count=len(exc.errors()),
                 provider=self._label,
             )
-            raise AnalyzerError("invalid_schema", "Model response failed validation") from exc
+            raise AnalyzerError(
+                "invalid_schema",
+                "Model response failed validation",
+                details=ProviderError(
+                    error_code="invalid_schema",
+                    error_category="schema_validation_error",
+                    attempt_count=1,
+                    provider_message_sanitized="Model response failed validation",
+                ).model_dump(),
+            ) from exc
 
         duration_ms = int((time.perf_counter() - started) * 1000)
         input_tokens, output_tokens = self._usage(response)
@@ -251,4 +389,5 @@ class GeminiAnalyzer(Analyzer):
             retrieval_signals=sorted(
                 {s for case in similar_cases[:3] for s in (case.get("matchingSignals") or [])}
             )[:20],
+            provider_attempts=list(self._last_attempts),
         )
