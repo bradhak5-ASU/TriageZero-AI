@@ -96,7 +96,7 @@ Frontend at http://localhost:5174, backend at http://localhost:8001, API docs at
 
 Frontend (`.env.example`): `VITE_API_BASE_URL` (default `http://localhost:8001`), `VITE_USE_MOCK_API` (default `true`).
 
-Backend (`backend/.env.example`): `APP_ENV`, `APP_HOST`, `APP_PORT`, `DATABASE_URL` (SQLite, default `backend/data/triagezero.db`), `FRONTEND_ORIGINS` (comma-separated CORS allowlist, default `http://localhost:5174`), `MAX_REQUEST_BYTES`, `LOCAL_PROCESSING_DELAY_MS`, `LOG_LEVEL`, API-auth settings (`API_AUTH_REQUIRED`, `INGESTION_API_TOKEN`, `DASHBOARD_API_TOKEN`), plus the AI settings (`ANALYZER_MODE`, `AI_FALLBACK_ENABLED`, `GEMINI_API_KEY` — blank in all committed files —, `GEMINI_MODEL`, `GEMINI_REQUEST_TIMEOUT_SECONDS`, `GEMINI_MAX_RETRIES`, `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `AI_PROMPT_VERSION`). Never commit a real `.env`.
+Backend (`backend/.env.example`): `APP_ENV`, `APP_HOST`, `APP_PORT`, `DATABASE_URL` (SQLite, default `backend/data/triagezero.db`), `FRONTEND_ORIGINS` (comma-separated CORS allowlist, default `http://localhost:5174`), `MAX_REQUEST_BYTES`, `LOCAL_PROCESSING_DELAY_MS`, `LOG_LEVEL`, API-auth settings (`API_AUTH_REQUIRED`, `INGESTION_API_TOKEN`, `DASHBOARD_API_TOKEN`), plus the AI settings (`ANALYZER_MODE`, `AI_FALLBACK_ENABLED`, `GEMINI_API_KEY` — blank in all committed files —, `GEMINI_MODEL`, `GEMINI_REQUEST_TIMEOUT_SECONDS`, `ADK_REQUEST_TIMEOUT_SECONDS`, `GEMINI_MAX_RETRIES`, `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `AI_PROMPT_VERSION`). Never commit a real `.env`.
 
 ## API
 

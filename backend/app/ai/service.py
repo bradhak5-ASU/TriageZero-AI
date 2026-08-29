@@ -78,7 +78,7 @@ def build_analyzer(settings: Settings | None = None) -> Analyzer:
         runner_factory = _adk_runner_factory or (
             lambda: GoogleAdkRunner(
                 model=s.gemini_model,
-                timeout_seconds=s.gemini_request_timeout_seconds,
+                timeout_seconds=s.adk_request_timeout_seconds,
                 api_key=s.gemini_api_key or None,
                 use_vertex=s.google_genai_use_vertexai,
                 project=s.google_cloud_project or None,
@@ -89,6 +89,7 @@ def build_analyzer(settings: Settings | None = None) -> Analyzer:
         return AdkWorkflowAnalyzer(
             model=s.gemini_model,
             runner_factory=runner_factory,
+            max_retries=s.gemini_max_retries,
         )
 
     return DeterministicAnalyzer()

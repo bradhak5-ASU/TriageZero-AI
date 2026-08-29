@@ -63,7 +63,15 @@ def poisoned_package(text: str) -> FailurePackage:
 
 
 def settings_for(**overrides) -> Settings:
-    return Settings(**{"analyzer_mode": "deterministic", "gemini_api_key": "", **overrides})
+    return Settings(
+        **{
+            "analyzer_mode": "deterministic",
+            "gemini_api_key": "",
+            "google_genai_use_vertexai": False,
+            "google_cloud_project": "",
+            **overrides,
+        }
+    )
 
 
 # --- prompt structure ------------------------------------------------------

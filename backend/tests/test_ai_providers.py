@@ -41,6 +41,8 @@ def settings_for(**overrides) -> Settings:
         "ai_fallback_enabled": True,
         "gemini_api_key": "",
         "gemini_model": "gemini-3.6-flash",
+        "google_genai_use_vertexai": False,
+        "google_cloud_project": "",
     }
     return Settings(**{**base, **overrides})
 
@@ -392,10 +394,17 @@ def test_production_adk_mode_constructs_real_runner_lazily():
     from app.ai.adk_workflow import GoogleAdkRunner
 
     analyzer = build_analyzer(
-        settings_for(analyzer_mode="gemini_adk", gemini_api_key="placeholder")
+        settings_for(
+            analyzer_mode="gemini_adk",
+            gemini_api_key="placeholder",
+            gemini_request_timeout_seconds=11,
+            adk_request_timeout_seconds=91,
+        )
     )
     assert analyzer._runner is None
-    assert isinstance(analyzer._get_runner(), GoogleAdkRunner)
+    runner = analyzer._get_runner()
+    assert isinstance(runner, GoogleAdkRunner)
+    assert runner._timeout == 91
 
 
 def test_adk_runner_receives_only_sanitized_evidence(pkg):
@@ -457,10 +466,46 @@ def test_adk_runner_failure_falls_back(pkg):
     runner = FakeAdkRunner(error=RuntimeError("agent exploded"))
     set_adk_runner_factory(lambda: runner)
     set_gemini_client_factory(lambda: object())
-    s = settings_for(analyzer_mode="gemini_adk")
+    s = settings_for(analyzer_mode="gemini_adk", gemini_max_retries=0)
 
     result = run_analysis(pkg, [], AnalysisContext(), settings=s)
     assert result.provider == "deterministic_fallback"
+    assert result.provider_error is not None
+    assert result.provider_error.error_category == "unknown_provider_error"
+    assert result.provider_error.attempt_count == 1
+
+
+def test_adk_retries_a_rate_limit_and_records_attempts(pkg, monkeypatch):
+    class RateLimitedOnce:
+        def __init__(self):
+            self.calls = 0
+            self.usage = {"input_tokens": 100, "output_tokens": 20}
+
+        def run(self, **_kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                raise FakeProviderHttpError(429, "resource exhausted")
+            return dict(VALID_RESULT)
+
+    runner = RateLimitedOnce()
+    set_adk_runner_factory(lambda: runner)
+    set_gemini_client_factory(lambda: object())
+    monkeypatch.setattr("app.ai.adk_workflow.time.sleep", lambda _seconds: None)
+
+    result = run_analysis(
+        pkg,
+        [],
+        AnalysisContext(),
+        settings=settings_for(analyzer_mode="gemini_adk", gemini_max_retries=1),
+    )
+
+    assert result.provider == "gemini_adk"
+    assert runner.calls == 2
+    assert [attempt.outcome for attempt in result.provider_attempts] == [
+        "retryable_error",
+        "success",
+    ]
+    assert result.provider_attempts[0].error_category == "rate_limit"
 
 
 def test_adk_tools_are_read_only():
@@ -474,11 +519,25 @@ def test_adk_tools_are_read_only():
         "inspect_failure_text",
         "retrieve_similar_cases",
         "calculate_risk",
-        "validate_result",
     }
     forbidden = {"shell", "exec", "write", "delete", "fetch", "http", "github", "env"}
     for name in names:
         assert not any(bad in name for bad in forbidden)
+
+
+def test_tool_using_adk_agent_has_one_structured_output_path():
+    """The ADK owns final-response shaping while the application validates the
+    same closed schema again. ``validate_result`` must not also be a tool: two
+    schema tools caused Vertex to finish with an empty object.
+    """
+    from app.ai.adk_workflow import build_adk_agent
+    from app.ai.schemas import ModelAnalysis
+
+    agent = build_adk_agent("gemini-3.6-flash")
+
+    assert agent.output_schema is ModelAnalysis
+    tool_names = {getattr(tool, "name", getattr(tool, "__name__", "")) for tool in agent.tools}
+    assert "validate_result" not in tool_names
 
 
 # --- persistence of provider metadata --------------------------------------

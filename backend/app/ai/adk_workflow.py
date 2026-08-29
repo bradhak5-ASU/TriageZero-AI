@@ -31,6 +31,7 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
+from app.ai.gemini import _classify_error, _provider_error
 from app.ai.prompts import (
     ADK_SYSTEM_INSTRUCTION,
     EVIDENCE_CLOSE,
@@ -43,6 +44,7 @@ from app.ai.schemas import (
     AnalysisContext,
     AnalysisResult,
     ModelAnalysis,
+    ProviderAttempt,
     StageSummary,
 )
 from app.schemas.failure_package import FailurePackage
@@ -137,7 +139,6 @@ READ_ONLY_TOOLS: tuple[Callable[..., Any], ...] = (
     inspect_failure_text,
     retrieve_similar_cases,
     calculate_risk,
-    validate_result,
 )
 
 
@@ -156,10 +157,16 @@ def build_adk_agent(model: str) -> Any:
             ADK_SYSTEM_INSTRUCTION
             + "\n\nWORKFLOW: use the read-only tools to inspect network, console and "
             "failure text; correlate sanitized similar cases; call calculate_risk for "
-            "severity and release risk (never assert them yourself); then emit the "
-            "structured result and confirm it with validate_result."
+            "severity and release risk (never assert them yourself); then return the "
+            "required structured result. The ADK enforces ModelAnalysis on the final "
+            "response, and the application validates it again before persistence."
         ),
         tools=list(READ_ONLY_TOOLS),
+        # google-adk 1.35+ supports tools and output_schema together. It keeps
+        # the evidence tools available during the investigation loop and
+        # constrains only the final model response. Do not also register our
+        # validate_result helper as a tool: that creates a second, competing
+        # structured-output path and can end the Vertex turn with an empty {}.
         output_schema=ModelAnalysis,
     )
 
@@ -340,11 +347,13 @@ class AdkWorkflowAnalyzer(Analyzer):
         model: str,
         runner_factory: Callable[[], Any] | None = None,
         provider_label: str = "gemini_adk",
+        max_retries: int = 2,
     ) -> None:
         self._model = model
         self._runner_factory = runner_factory
         self._runner: Any | None = None
         self._label = provider_label
+        self._max_retries = max(0, max_retries)
 
     def _get_runner(self) -> Any | None:
         if self._runner_factory is None:
@@ -390,17 +399,80 @@ class AdkWorkflowAnalyzer(Analyzer):
         # 2 + 3. classification and root-cause synthesis
         t0 = time.perf_counter()
         runner = self._get_runner()
+        attempts: list[ProviderAttempt] = []
         if runner is not None:
-            try:
-                produced = runner.run(
-                    package=package,
-                    similar_cases=retrieve_similar_cases(similar_cases),
-                    signals=signals,
-                )
-            except AnalyzerError:
-                raise
-            except Exception as exc:  # noqa: BLE001 - surfaced as a safe code
-                raise AnalyzerError("provider_error", "ADK workflow failed") from exc
+            for attempt in range(self._max_retries + 1):
+                attempt_started = time.perf_counter()
+                try:
+                    produced = runner.run(
+                        package=package,
+                        similar_cases=retrieve_similar_cases(similar_cases),
+                        signals=signals,
+                    )
+                    attempts.append(
+                        ProviderAttempt(
+                            attempt=attempt + 1,
+                            duration_ms=int((time.perf_counter() - attempt_started) * 1000),
+                            outcome="success",
+                        )
+                    )
+                    break
+                except AnalyzerError as exc:
+                    if not exc.retryable:
+                        raise
+                    category = str(exc.details.get("error_category") or exc.code)
+                    http_status = exc.details.get("http_status")
+                    attempts.append(
+                        ProviderAttempt(
+                            attempt=attempt + 1,
+                            duration_ms=int((time.perf_counter() - attempt_started) * 1000),
+                            outcome="retryable_error",
+                            error_category=category,
+                            http_status=http_status if isinstance(http_status, int) else None,
+                        )
+                    )
+                    if attempt == self._max_retries:
+                        details = dict(exc.details)
+                        details.setdefault("error_category", category)
+                        details.setdefault("http_status", http_status)
+                        details["attempt_count"] = len(attempts)
+                        details["attempts"] = [item.model_dump() for item in attempts]
+                        raise AnalyzerError(
+                            exc.code,
+                            "ADK workflow failed after bounded retries",
+                            retryable=True,
+                            details=details,
+                        ) from exc
+                except Exception as exc:  # noqa: BLE001 - mapped to safe metadata
+                    code, category, http_status, retryable, safe_message = _classify_error(exc)
+                    attempts.append(
+                        ProviderAttempt(
+                            attempt=attempt + 1,
+                            duration_ms=int((time.perf_counter() - attempt_started) * 1000),
+                            outcome="retryable_error" if retryable else "permanent_error",
+                            error_category=category,
+                            http_status=http_status,
+                        )
+                    )
+                    if not retryable or attempt == self._max_retries:
+                        raise AnalyzerError(
+                            code,
+                            "ADK workflow failed",
+                            retryable=retryable,
+                            details=_provider_error(
+                                code=code,
+                                category=category,
+                                http_status=http_status,
+                                message=safe_message,
+                                attempts=attempts,
+                            ).model_dump(),
+                        ) from exc
+                # A rate limit usually needs a longer cool-down than a
+                # transport retry. This sleep occurs in the worker thread.
+                delay = 10.0 * (attempt + 1) if attempts[-1].error_category == "rate_limit" else 2.0
+                time.sleep(delay)
+            else:  # pragma: no cover - the bounded loop always returns or raises
+                raise AnalyzerError("provider_error", "ADK workflow did not produce a result")
             if not isinstance(produced, dict):
                 raise AnalyzerError("invalid_schema", "ADK runner returned a non-object")
             base = dict(produced)
@@ -463,6 +535,7 @@ class AdkWorkflowAnalyzer(Analyzer):
             duration_ms=duration_ms,
             input_tokens=(usage or {}).get("input_tokens") if isinstance(usage, dict) else None,
             output_tokens=(usage or {}).get("output_tokens") if isinstance(usage, dict) else None,
+            provider_attempts=attempts,
             retrieval_signals=sorted(
                 {s for case in correlated for s in (case.get("matching_signals") or [])}
             )[:20],

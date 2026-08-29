@@ -47,6 +47,21 @@ SAMPLE_PACKAGE = {
 }
 
 
+@pytest.fixture(autouse=True)
+def disable_live_ai_providers(monkeypatch):
+    """The test suite is offline even when a developer's ignored .env selects
+    Vertex or contains live credentials.
+
+    Tests that exercise provider behavior inject fakes and may construct
+    Settings with explicit values, but no test may inherit a live provider
+    configuration from the workstation.
+    """
+    monkeypatch.setenv("ANALYZER_MODE", "deterministic")
+    monkeypatch.setenv("GEMINI_API_KEY", "")
+    monkeypatch.setenv("GOOGLE_GENAI_USE_VERTEXAI", "false")
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "")
+
+
 @pytest.fixture()
 def sample_package() -> dict:
     return copy.deepcopy(SAMPLE_PACKAGE)
@@ -61,6 +76,8 @@ def make_client(tmp_path, monkeypatch) -> Callable[..., TestClient]:
     monkeypatch.setenv("FRONTEND_ORIGINS", "http://localhost:5174")
     monkeypatch.setenv("ANALYZER_MODE", "deterministic")
     monkeypatch.setenv("GEMINI_API_KEY", "")
+    monkeypatch.setenv("GOOGLE_GENAI_USE_VERTEXAI", "false")
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "")
     monkeypatch.setenv("API_AUTH_REQUIRED", "false")
     monkeypatch.setenv("INGESTION_API_TOKEN", "")
     monkeypatch.setenv("DASHBOARD_API_TOKEN", "")

@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.6-flash"
     gemini_request_timeout_seconds: int = 60
     gemini_max_retries: int = 2
+    # ADK may perform multiple sequential model/tool turns, so its total
+    # workflow deadline must be independent from the direct Gemini call.
+    adk_request_timeout_seconds: int = 120
 
     google_genai_use_vertexai: bool = False
     google_cloud_project: str = ""

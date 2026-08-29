@@ -72,6 +72,9 @@ provider, never a pretended one.
 Gemini chooses classification, confidence, root cause, and the proposed action.
 The application then applies one shared deterministic severity/release-risk
 policy, because generated text must not directly control a release gate.
+Direct Gemini and ADK use separate deadlines: an agent may require multiple
+model/tool turns. Transient ADK provider failures use bounded retries and record
+sanitized attempt category/status metadata instead of an opaque fallback.
 
 See `../docs/AI_ARCHITECTURE.md`, `../docs/EVALUATION.md`, and
 `../docs/CREDENTIALS_SETUP.md`.

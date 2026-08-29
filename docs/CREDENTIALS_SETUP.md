@@ -118,7 +118,9 @@ backend with `docker compose up --build -d backend`.
   provider outage degrades to deterministic analysis instead of failing ingestion.
 - `GEMINI_REQUEST_TIMEOUT_SECONDS` and `GEMINI_MAX_RETRIES` bound the spend per
   investigation. The direct Gemini HTTP client and the ADK workflow both apply
-  the request deadline; retries apply only to transient direct-Gemini errors.
+  bounded retries to transient provider errors. ADK uses its separate
+  `ADK_REQUEST_TIMEOUT_SECONDS` total workflow deadline because it may perform
+  multiple sequential model/tool turns.
 - The frontend never receives the key: `VITE_*` variables are the only values
   baked into the bundle, and `GEMINI_API_KEY` is not one of them.
 - To use Vertex AI instead of the Gemini Developer API, set
