@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   FolderSearch,
+  LogOut,
   Menu,
   Moon,
   Search,
@@ -10,6 +11,7 @@ import {
   Sun,
 } from 'lucide-react';
 import { config } from '../../app/config';
+import { useAuth } from '../../context/AuthContext';
 import { useInvestigations } from '../../context/InvestigationsContext';
 import { useSettings } from '../../context/SettingsContext';
 import { formatRelativeTime } from '../../utils/format';
@@ -22,6 +24,7 @@ export function TopBar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
   const navigate = useNavigate();
   const { items } = useInvestigations();
   const { environment, setEnvironment, settings, toggleTheme } = useSettings();
+  const { status: authStatus, email, signOut } = useAuth();
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -219,9 +222,30 @@ export function TopBar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
         {settings.theme === 'dark' ? <Sun size={17} aria-hidden /> : <Moon size={17} aria-hidden />}
       </button>
 
-      <span className="avatar" title="Signed in as QA engineer (placeholder)" aria-label="User avatar placeholder">
-        BR
-      </span>
+      {authStatus === 'signed-in' ? (
+        <>
+          <span
+            className="avatar"
+            title={email ? `Signed in as ${email}` : 'Signed in'}
+            aria-label={email ? `Signed in as ${email}` : 'Signed in'}
+          >
+            {(email ?? 'U').slice(0, 2).toUpperCase()}
+          </span>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => void signOut()}
+            aria-label="Sign out"
+            title="Sign out"
+          >
+            <LogOut size={17} aria-hidden />
+          </button>
+        </>
+      ) : (
+        <span className="avatar" title="Not signed in" aria-label="Not signed in">
+          --
+        </span>
+      )}
     </header>
   );
 }

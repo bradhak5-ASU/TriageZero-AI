@@ -4,6 +4,9 @@ from app.core.config import Settings
 
 INGESTION_TOKEN = "ingestion-token-0123456789-abcdef-XYZ"
 DASHBOARD_TOKEN = "dashboard-token-0123456789-abcdef-XYZ"
+#: Any non-SQLite URL satisfies the production durability check. Nothing here
+#: connects to it - these tests only construct Settings.
+DURABLE_DATABASE_URL = "postgresql+psycopg://u:p@db.internal:5432/triagezero"
 
 
 def bearer(token: str) -> dict[str, str]:
@@ -59,6 +62,9 @@ def test_enabled_auth_requires_strong_distinct_tokens(ingestion, dashboard, matc
 def test_secret_tokens_are_masked_in_settings_representation():
     settings = Settings(
         app_env="production",
+        # production also requires a durable database - see test_postgres_support
+        database_url=DURABLE_DATABASE_URL,
+        frontend_origins="https://tz.example.com",
         api_auth_required=True,
         ingestion_api_token=INGESTION_TOKEN,
         dashboard_api_token=DASHBOARD_TOKEN,

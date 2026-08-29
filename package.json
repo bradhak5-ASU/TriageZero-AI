@@ -6,7 +6,7 @@
   "engines": {
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   },
-  "description": "TriageZero — Autonomous Failure Intelligence. Engineering dashboard frontend.",
+  "description": "TriageZero \u2014 Autonomous Failure Intelligence. Engineering dashboard frontend.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -17,6 +17,7 @@
     "verify:runtime": "node --version && npm ls react-router-dom vite vitest jsdom --depth=0"
   },
   "dependencies": {
+    "firebase": "^12.5.0",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

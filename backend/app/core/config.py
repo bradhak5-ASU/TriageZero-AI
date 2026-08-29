@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     ingestion_api_token: SecretStr = SecretStr("")
     dashboard_api_token: SecretStr = SecretStr("")
 
+    # --- human sign-in (Firebase Authentication) -----------------------------
+    # Humans sign in through Firebase and send a short-lived ID token; machines
+    # keep using INGESTION_API_TOKEN. The two are verified independently.
+    # Disabled by default so local development and tests need no Firebase project.
+    firebase_auth_enabled: bool = False
+    firebase_project_id: str = ""
+
     # --- analysis providers -------------------------------------------------
     # Default stays deterministic: no credentials, no network, fully local.
     # Switch to gemini / gemini_adk only after credentials are supplied
@@ -79,6 +86,87 @@ class Settings(BaseSettings):
         if ingestion == dashboard:
             raise ValueError("INGESTION_API_TOKEN and DASHBOARD_API_TOKEN must be different")
         return self
+
+    @model_validator(mode="after")
+    def validate_firebase_auth(self) -> "Settings":
+        """Firebase must be usable when it is switched on.
+
+        A project id is required for audience checking; without it every token
+        would fail verification and the dashboard would be silently unusable.
+        """
+        if not self.firebase_auth_enabled:
+            return self
+        if not (self.firebase_project_id or self.google_cloud_project):
+            raise ValueError(
+                "FIREBASE_PROJECT_ID (or GOOGLE_CLOUD_PROJECT) must be set "
+                "when FIREBASE_AUTH_ENABLED is true"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_durable_database(self) -> "Settings":
+        """Refuse to run staging/production on an ephemeral SQLite file.
+
+        Cloud Run gives each container an in-memory filesystem that is thrown
+        away on every restart, redeploy and scale-to-zero. A SQLite database
+        there appears to work and then silently loses every investigation -
+        the worst possible failure mode, because nothing errors. Failing at
+        startup instead makes the misconfiguration impossible to miss.
+        """
+        environment = self.app_env.strip().lower()
+        if environment not in {"staging", "production"}:
+            return self
+        if self.database_url.strip().lower().startswith("sqlite"):
+            raise ValueError(
+                "DATABASE_URL must point at a durable database (PostgreSQL) in "
+                "staging and production - a SQLite file on Cloud Run is erased "
+                "on every restart. Example: "
+                "postgresql+psycopg://USER:PASSWORD@/DB?host=/cloudsql/PROJECT:REGION:INSTANCE"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_cors_in_production(self) -> "Settings":
+        """The browser origin allowed to call this API must be exact.
+
+        `allow_origins=["*"]` combined with an Authorization header is the
+        classic way a dashboard API becomes callable from any page the signed-in
+        user happens to visit. Requiring explicit HTTPS origins in
+        staging/production makes that impossible to configure by accident.
+        """
+        environment = self.app_env.strip().lower()
+        if environment not in {"staging", "production"}:
+            return self
+        origins = self.cors_origins
+        if not origins:
+            raise ValueError("FRONTEND_ORIGINS must list the exact dashboard origin(s)")
+        for origin in origins:
+            if origin == "*":
+                raise ValueError(
+                    "FRONTEND_ORIGINS must not be '*' in staging or production - "
+                    "list the exact dashboard origin"
+                )
+            if not origin.startswith("https://"):
+                raise ValueError(
+                    f"FRONTEND_ORIGINS entry {origin!r} must be an https:// origin "
+                    "in staging and production"
+                )
+            if origin.endswith("/"):
+                raise ValueError(
+                    f"FRONTEND_ORIGINS entry {origin!r} must have no trailing slash - "
+                    "browsers send the origin without one and it would never match"
+                )
+        return self
+
+    @property
+    def database_backend(self) -> str:
+        """`sqlite` or `postgresql` - the backend this configuration will use."""
+        url = self.database_url.strip().lower()
+        if url.startswith("sqlite"):
+            return "sqlite"
+        if url.startswith(("postgres://", "postgresql")):
+            return "postgresql"
+        return url.split(":", 1)[0] or "unknown"
 
     @property
     def cors_origins(self) -> list[str]:

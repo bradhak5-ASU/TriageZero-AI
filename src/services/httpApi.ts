@@ -62,12 +62,36 @@ async function errorMessage(res: Response): Promise<string> {
   }
 }
 
+/**
+ * Supplies the current Firebase ID token, or null when signed out /
+ * unconfigured. Installed by AuthProvider so this module never imports
+ * Firebase directly and stays trivially testable.
+ */
+type AuthTokenProvider = () => Promise<string | null>;
+
+let authTokenProvider: AuthTokenProvider | null = null;
+
+export function setAuthTokenProvider(provider: AuthTokenProvider | null): void {
+  authTokenProvider = provider;
+}
+
+async function authHeaders(): Promise<Record<string, string>> {
+  if (!authTokenProvider) return {};
+  try {
+    const token = await authTokenProvider();
+    return token ? { authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
+    const auth = await authHeaders();
     res = await fetch(`${config.apiBaseUrl}${path}`, {
-      headers: { 'content-type': 'application/json', ...init?.headers },
       ...init,
+      headers: { 'content-type': 'application/json', ...auth, ...init?.headers },
     });
   } catch {
     throw new ApiError(`Could not reach TriageZero API at ${config.apiBaseUrl}`);
