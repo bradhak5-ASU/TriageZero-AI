@@ -42,3 +42,6 @@ npm-debug.log*
 
 # misc
 *.local
+
+# scratch produced while verifying; safe to delete
+_to_delete/

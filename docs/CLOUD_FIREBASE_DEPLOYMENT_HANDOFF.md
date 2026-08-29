@@ -1,5 +1,13 @@
 # TriageZero — Cloud, Firebase Auth, and Production Handoff
 
+> **Superseded for deployment steps (August 29, 2026).**
+> Firebase Authentication, PostgreSQL support and Cloud Run readiness are now
+> implemented and verified in the repository, so the "to do" sections below are
+> history rather than instructions. The runbook you actually execute is
+> [`DEPLOYMENT.md`](./DEPLOYMENT.md); where the two disagree, DEPLOYMENT.md wins.
+> This file is kept as the record of what was planned and why.
+
+
 **Checkpoint date:** August 29, 2026
 
 **Repository:** `https://github.com/bradhak5-ASU/TriageZero-AI.git`

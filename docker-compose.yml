@@ -1,41 +1,43 @@
-# Complete local TriageZero stack.
-#   docker compose up --build
-# Frontend: http://localhost:5174   Backend: http://localhost:8001   Docs: http://localhost:8001/docs
-# Ports are deliberately offset from NovaCart (5173/8000) so both stacks run side by side.
+# Local stack. SQLite is fine here: the data volume is durable on your machine.
+# The cloud deployment must use PostgreSQL instead - see docs/DEPLOYMENT.md.
 services:
   backend:
     build: ./backend
-    # Optional and gitignored. With no file the stack stays deterministic.
-    # Copy backend/.env.example to backend/.env only when enabling Google AI.
-    env_file:
-      - path: ./backend/.env
-        required: false
     ports:
-      - "8001:8000"   # host 8001 -> container 8000
+      - "8001:8000"
     environment:
       APP_ENV: development
+      PORT: "8000"
       DATABASE_URL: sqlite:////app/data/triagezero.db
       FRONTEND_ORIGINS: http://localhost:5174
       LOCAL_PROCESSING_DELAY_MS: "250"
       LOG_LEVEL: INFO
-      # AI settings come from optional backend/.env or safe Settings defaults.
-      # Credentials are runtime-only and are never baked into either image.
+      ANALYZER_MODE: deterministic
+      AI_FALLBACK_ENABLED: "true"
+      GEMINI_API_KEY: ""
+      GEMINI_MODEL: gemini-2.5-flash
     volumes:
       - triagezero-data:/app/data
-
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        # build-time Vite variables — baked into the served bundle
         VITE_API_BASE_URL: http://localhost:8001
         VITE_USE_MOCK_API: "false"
+        # Left blank locally: the app then runs in open demo mode with no
+        # sign-in, which is what makes `docker compose up` work with no
+        # Firebase project.
+        VITE_FIREBASE_API_KEY: ""
+        VITE_FIREBASE_AUTH_DOMAIN: ""
+        VITE_FIREBASE_PROJECT_ID: ""
+        VITE_FIREBASE_APP_ID: ""
+    environment:
+      PORT: "8080"
     ports:
-      - "5174:80"   # host 5174 -> nginx 80
+      - "5174:8080"
     depends_on:
       backend:
         condition: service_healthy
-
 volumes:
   triagezero-data:

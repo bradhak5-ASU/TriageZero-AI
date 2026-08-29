@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import health, investigations
+from app.api.routes import health, investigations, probes
 from app.core.config import get_settings
 from app.core.errors import error_body, register_error_handlers
 from app.core.logging import configure_logging, log_event
@@ -72,6 +72,8 @@ def create_app() -> FastAPI:
 
     register_error_handlers(app)
     app.include_router(health.router, prefix="/api/v1", tags=["health"])
+    # Container probes: cheap, unauthenticated, excluded from the public schema.
+    app.include_router(probes.router, prefix="/api/v1", tags=["health"])
     app.include_router(investigations.router, prefix="/api/v1", tags=["investigations"])
 
     @app.get("/", include_in_schema=False)
