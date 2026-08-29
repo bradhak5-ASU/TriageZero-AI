@@ -5,7 +5,7 @@ from fastapi import APIRouter, Header, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from app.api.dependencies import SessionDep
+from app.api.dependencies import DashboardAuthDep, IngestionAuthDep, SessionDep
 from app.core.config import get_settings
 from app.core.errors import AppError, OracleFieldsError
 from app.core.logging import log_event
@@ -58,6 +58,7 @@ async def _read_body_limited(request: Request) -> bytes:
 async def ingest_failure(
     request: Request,
     session: SessionDep,
+    _auth: IngestionAuthDep,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> IngestAccepted | JSONResponse:
     # oracle detection runs against the RAW body, before any model parsing,
@@ -120,6 +121,7 @@ async def ingest_failure(
 )
 def list_investigations(
     session: SessionDep,
+    _auth: DashboardAuthDep,
     status: Annotated[
         str | None,
         Query(pattern="^(received|queued|analyzing|completed|failed|needs_review)$"),
@@ -157,7 +159,9 @@ def list_investigations(
     response_model=InvestigationOut,
     response_model_by_alias=True,
 )
-def get_investigation(investigation_id: str, session: SessionDep) -> dict:
+def get_investigation(
+    investigation_id: str, session: SessionDep, _auth: DashboardAuthDep
+) -> dict:
     return serialize(session, _get_or_404(session, investigation_id))
 
 
@@ -166,7 +170,9 @@ def get_investigation(investigation_id: str, session: SessionDep) -> dict:
     response_model=InvestigationOut,
     response_model_by_alias=True,
 )
-def retry_investigation(investigation_id: str, session: SessionDep) -> dict:
+def retry_investigation(
+    investigation_id: str, session: SessionDep, _auth: DashboardAuthDep
+) -> dict:
     record = _get_or_404(session, investigation_id)
     prepare_retry(session, record)
     processing.dispatcher.dispatch(record.id)
@@ -189,6 +195,7 @@ def decide_action(
     investigation_id: str,
     decision: Literal["approve", "reject"],
     session: SessionDep,
+    _auth: DashboardAuthDep,
 ) -> dict:
     record = _get_or_404(session, investigation_id)
     record_decision(session, record, decision)
@@ -209,6 +216,7 @@ def submit_resolution(
     investigation_id: str,
     body: ResolutionRequest,
     session: SessionDep,
+    _auth: DashboardAuthDep,
 ) -> dict:
     """Record a human-reviewed outcome.
 
@@ -217,9 +225,9 @@ def submit_resolution(
     prediction is preserved separately so prediction-versus-outcome accuracy
     stays measurable.
 
-    Local mode has no user system; the resolver is supplied by the caller and
-    recorded verbatim (sanitized). Wire real authorization before exposing this
-    endpoint outside localhost.
+    The resolver is supplied by the caller and recorded verbatim (sanitized).
+    When API authentication is enabled this endpoint requires the dedicated
+    dashboard/admin token; an ingestion token cannot record a resolution.
     """
     record = _get_or_404(session, investigation_id)
     record_resolution(

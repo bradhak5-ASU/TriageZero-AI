@@ -38,6 +38,7 @@ from app.ai.prompts import (
     build_evidence_payload,
 )
 from app.ai.protocols import Analyzer, AnalyzerError
+from app.ai.risk import calculate_risk
 from app.ai.schemas import (
     AnalysisContext,
     AnalysisResult,
@@ -123,29 +124,6 @@ def retrieve_similar_cases(similar_cases: list[dict[str, Any]]) -> list[dict[str
         }
         for case in similar_cases[:5]
     ]
-
-
-def calculate_risk(classification: str, confidence: float) -> dict[str, str]:
-    """Deterministic severity/release-risk policy.
-
-    Kept out of the model's hands on purpose: risk drives the release gate, so
-    it is computed from the classification, never asserted by generated text.
-    """
-    policy: dict[str, tuple[str, str]] = {
-        "backend_application_defect": ("critical", "block_release"),
-        "data_integrity_defect": ("high", "high"),
-        "frontend_application_defect": ("high", "high"),
-        "dependency_failure": ("high", "moderate"),
-        "performance_timing_defect": ("medium", "moderate"),
-        "test_automation_defect": ("medium", "low"),
-        "environment_failure": ("low", "none"),
-        "unknown": ("medium", "moderate"),
-    }
-    severity, release_risk = policy.get(classification, ("medium", "moderate"))
-    if confidence < 0.6 and release_risk == "block_release":
-        # never block a release on a weak signal
-        release_risk = "high"
-    return {"severity": severity, "release_risk": release_risk}
 
 
 def validate_result(payload: dict[str, Any]) -> dict[str, Any]:

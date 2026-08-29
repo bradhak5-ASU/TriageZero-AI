@@ -1,4 +1,4 @@
-# Credentials setup (do this later, yourself)
+# Credentials setup
 
 TriageZero runs **fully without credentials**. Everything — the API, the
 dashboard, the deterministic analyzer, the test suite, the evaluation harness,
@@ -97,7 +97,7 @@ file. The file is excluded from Git and the Docker build context. With no file,
 the container remains in deterministic mode. After editing it, recreate the
 backend with `docker compose up --build -d backend`.
 
-10. **Run the Gemini evaluation** and compare it against the deterministic
+10. **Run the provider evaluation** and compare it against the deterministic
     baseline on identical data:
 
     ```bash

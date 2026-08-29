@@ -103,6 +103,13 @@ def test_seeding_refuses_production_mode(monkeypatch, tmp_path):
     from app.core.config import get_settings
 
     monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("API_AUTH_REQUIRED", "true")
+    monkeypatch.setenv(
+        "INGESTION_API_TOKEN", "seed-test-ingestion-token-0123456789-abcdef"
+    )
+    monkeypatch.setenv(
+        "DASHBOARD_API_TOKEN", "seed-test-dashboard-token-0123456789-abcdef"
+    )
     get_settings.cache_clear()
     with pytest.raises(SystemExit, match="Refusing to seed"):
         seed(10, 1, database_url=f"sqlite:///{tmp_path}/x.db")

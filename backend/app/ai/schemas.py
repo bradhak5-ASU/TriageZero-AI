@@ -122,7 +122,7 @@ class AnalysisResult(BaseModel):
 
     provider: Provider
     model_name: str | None = None
-    prompt_version: str = "v1"
+    prompt_version: str = "v2"
     analysis_schema_version: str = ANALYSIS_SCHEMA_VERSION
     stage_summaries: list[StageSummary] = Field(default_factory=list)
     duration_ms: int = Field(default=0, ge=0)
@@ -160,5 +160,5 @@ class AnalysisContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     investigation_id: str | None = None
-    prompt_version: str = "v1"
+    prompt_version: str = "v2"
     allow_fallback: bool = True

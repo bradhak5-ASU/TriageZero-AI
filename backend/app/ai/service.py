@@ -12,8 +12,7 @@ from typing import Any
 
 from app.ai.deterministic import DeterministicAnalyzer, classify
 from app.ai.protocols import Analyzer, AnalyzerError
-from app.ai.schemas import AnalysisContext, AnalysisResult, StageSummary
-from app.ai.schemas import ProviderError
+from app.ai.schemas import AnalysisContext, AnalysisResult, ProviderError, StageSummary
 from app.ai.telemetry import telemetry
 from app.core.config import Settings, get_settings
 from app.core.logging import log_event

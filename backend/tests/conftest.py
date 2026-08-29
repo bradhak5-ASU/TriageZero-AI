@@ -59,6 +59,11 @@ def make_client(tmp_path, monkeypatch) -> Callable[..., TestClient]:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path}/test.db")
     monkeypatch.setenv("LOCAL_PROCESSING_DELAY_MS", "0")
     monkeypatch.setenv("FRONTEND_ORIGINS", "http://localhost:5174")
+    monkeypatch.setenv("ANALYZER_MODE", "deterministic")
+    monkeypatch.setenv("GEMINI_API_KEY", "")
+    monkeypatch.setenv("API_AUTH_REQUIRED", "false")
+    monkeypatch.setenv("INGESTION_API_TOKEN", "")
+    monkeypatch.setenv("DASHBOARD_API_TOKEN", "")
 
     created: list[TestClient] = []
 

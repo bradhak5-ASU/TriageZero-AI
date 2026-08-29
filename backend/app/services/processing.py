@@ -72,7 +72,10 @@ dispatcher: Dispatcher = LocalDispatcher()
 async def _process_async(investigation_id: str, delay_ms: int) -> None:
     for step_index in range(len(PIPELINE_STEPS)):
         await asyncio.sleep(delay_ms / 1000)
-        done = _advance(investigation_id, step_index)
+        # Provider SDK calls are synchronous. Run each database/pipeline step
+        # in a worker thread so a slow model request or bounded retry cannot
+        # block the FastAPI event loop, health checks, or dashboard reads.
+        done = await asyncio.to_thread(_advance, investigation_id, step_index)
         if done:
             return
 
@@ -87,10 +90,16 @@ def process_investigation(investigation_id: str, delay_ms: int = 0) -> None:
 def _analyze(pkg: FailurePackage, cases: list, investigation_id: str) -> AnalysisResult:
     """Run the configured analyzer. Never raises: the service applies the
     fallback policy and always returns a validated result."""
+    settings = get_settings()
     return run_analysis(
         pkg,
         cases,
-        AnalysisContext(investigation_id=investigation_id),
+        AnalysisContext(
+            investigation_id=investigation_id,
+            prompt_version=settings.ai_prompt_version,
+            allow_fallback=settings.ai_fallback_enabled,
+        ),
+        settings=settings,
     )
 
 

@@ -6,9 +6,10 @@ When a Playwright test fails in the NovaCart repository, the harness captures ev
 
 This repository contains the complete **local milestone**: the React dashboard,
 a working FastAPI backend with durable persistence, a deterministic analyzer,
-and optional production adapters for Gemini and Google ADK. Google Cloud
-deployment remains a later milestone; everything here still runs with **zero
-credentials**.
+and optional production adapters for Gemini and Google ADK. The direct Gemini
+path has been verified locally against the live provider; Google ADK and Google
+Cloud deployment remain later milestones. The default deterministic mode still
+runs with **zero credentials**.
 
 ## Architecture (local milestone)
 
@@ -95,7 +96,7 @@ Frontend at http://localhost:5174, backend at http://localhost:8001, API docs at
 
 Frontend (`.env.example`): `VITE_API_BASE_URL` (default `http://localhost:8001`), `VITE_USE_MOCK_API` (default `true`).
 
-Backend (`backend/.env.example`): `APP_ENV`, `APP_HOST`, `APP_PORT`, `DATABASE_URL` (SQLite, default `backend/data/triagezero.db`), `FRONTEND_ORIGINS` (comma-separated CORS allowlist, default `http://localhost:5174`), `MAX_REQUEST_BYTES`, `LOCAL_PROCESSING_DELAY_MS`, `LOG_LEVEL`, plus the AI settings (`ANALYZER_MODE`, `AI_FALLBACK_ENABLED`, `GEMINI_API_KEY` — blank in all committed files —, `GEMINI_MODEL`, `GEMINI_REQUEST_TIMEOUT_SECONDS`, `GEMINI_MAX_RETRIES`, `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `AI_PROMPT_VERSION`). Never commit a real `.env`; no secrets exist in this milestone.
+Backend (`backend/.env.example`): `APP_ENV`, `APP_HOST`, `APP_PORT`, `DATABASE_URL` (SQLite, default `backend/data/triagezero.db`), `FRONTEND_ORIGINS` (comma-separated CORS allowlist, default `http://localhost:5174`), `MAX_REQUEST_BYTES`, `LOCAL_PROCESSING_DELAY_MS`, `LOG_LEVEL`, API-auth settings (`API_AUTH_REQUIRED`, `INGESTION_API_TOKEN`, `DASHBOARD_API_TOKEN`), plus the AI settings (`ANALYZER_MODE`, `AI_FALLBACK_ENABLED`, `GEMINI_API_KEY` — blank in all committed files —, `GEMINI_MODEL`, `GEMINI_REQUEST_TIMEOUT_SECONDS`, `GEMINI_MAX_RETRIES`, `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `AI_PROMPT_VERSION`). Never commit a real `.env`.
 
 ## API
 
@@ -112,6 +113,15 @@ POST /api/v1/investigations/{id}/actions/reject    record decision
 ```
 
 Ingestion returns `{"investigation_id": "INV-…", "status": "received", "received_at": …}`. Investigation objects use the frontend's camelCase domain types verbatim (`src/types/index.ts`).
+
+**Authentication.** Local development defaults to `API_AUTH_REQUIRED=false`.
+When enabled, Playwright submits an ingestion token as
+`Authorization: Bearer …`; it is never added to the failure package. Dashboard
+and investigation-management routes require the separate dashboard token, while
+health remains public and secret-free. `staging` and `production` fail closed
+unless authentication is enabled with distinct tokens of at least 32 characters.
+Do not place the dashboard token in a `VITE_*` variable: production should put
+the SPA behind an identity-aware proxy or a same-origin server-side proxy.
 
 **Idempotency.** Re-submitting an identical package (SHA-256 canonical fingerprint) returns the existing investigation. An optional `Idempotency-Key` header does the same for a replay of the *same* package; reusing a key with **different** evidence returns `409 idempotency_key_conflict` naming the original investigation rather than silently returning stale results. Both the key and the fingerprint are unique columns, so concurrent duplicate submissions race in the database and resolve to a single investigation.
 
@@ -135,7 +145,7 @@ Three analyzer modes share one interface and one validated result type:
 | `gemini` | One structured-output call via `google-genai` |
 | `gemini_adk` | Staged Google ADK workflow with read-only tools |
 
-**The default never changes on its own, and nothing here needs credentials.**
+**The default never changes on its own, and deterministic mode needs no credentials.**
 Selecting a model mode without a key does not pretend the model ran: the
 provider is recorded as `deterministic_fallback` with a reason, or — with
 `AI_FALLBACK_ENABLED=false` — the investigation is marked `needs_review`.
@@ -183,8 +193,8 @@ See [docs/EVALUATION.md](docs/EVALUATION.md).
 
 ## Current limitations
 
-- Gemini and ADK are implemented but **unverified against the live services** —
-  no credentials were used, so every AI test runs against injected fakes.
+- Direct Gemini has been verified locally on the six controlled NovaCart
+  scenarios; Google ADK and Vertex AI are implemented but not yet live-verified.
 - Synthetic benchmark numbers do not predict production accuracy.
 - Artifacts are metadata only (no upload/download until Cloud Storage).
 - GitHub Actions links and issue creation are honest placeholders; decisions are recorded, never executed.
@@ -193,9 +203,9 @@ See [docs/EVALUATION.md](docs/EVALUATION.md).
 
 ## Next milestone: cloud integration
 
-1. Supply credentials and verify Gemini / ADK against the live services
+1. Verify Google ADK / Vertex AI against the live services
    ([docs/CREDENTIALS_SETUP.md](docs/CREDENTIALS_SETUP.md)), then compare against
-   the deterministic baseline on identical data.
+   the deterministic and direct-Gemini baselines on identical data.
 2. Swap the local dispatcher for Pub/Sub and SQLite for Firestore.
 3. Add Cloud Storage artifact uploads (artifacts are metadata-only today).
 4. Deploy to Cloud Run; connect NovaCart CI to submit packages automatically

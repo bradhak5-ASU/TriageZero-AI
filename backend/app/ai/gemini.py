@@ -22,6 +22,7 @@ from pydantic import ValidationError
 
 from app.ai.prompts import SYSTEM_INSTRUCTION, build_user_prompt
 from app.ai.protocols import Analyzer, AnalyzerError
+from app.ai.risk import apply_risk_policy
 from app.ai.schemas import (
     AnalysisContext,
     AnalysisResult,
@@ -104,7 +105,8 @@ def _classify_error(exc: Exception) -> tuple[str, str, int | None, bool, str]:
         return "timeout", "timeout", status, True, safe_message
     if "connection reset" in text:
         return "connection_error", "connection_reset", status, True, safe_message
-    if any(marker in text for marker in ("dns", "name resolution", "temporary failure", "connection error")):
+    connection_markers = ("dns", "name resolution", "temporary failure", "connection error")
+    if any(marker in text for marker in connection_markers):
         return "connection_error", "connection_error", status, True, safe_message
     if any(marker in text for marker in _RETRYABLE_MARKERS):
         return "transient_error", "sdk_transport_error", status, True, safe_message
@@ -348,7 +350,7 @@ class GeminiAnalyzer(Analyzer):
         try:
             # closed schema: unknown fields (including any smuggled reasoning)
             # and out-of-range values are rejected here, before persistence
-            analysis = ModelAnalysis.model_validate(payload)
+            analysis = apply_risk_policy(ModelAnalysis.model_validate(payload))
         except ValidationError as exc:
             log_event(
                 "gemini response failed schema validation",
@@ -381,7 +383,14 @@ class GeminiAnalyzer(Analyzer):
                         f"(confidence {analysis.confidence:.2f})."
                     ),
                     duration_ms=duration_ms,
-                )
+                ),
+                StageSummary(
+                    stage="risk_assessment",
+                    summary=(
+                        f"Application policy assigned severity={analysis.severity}, "
+                        f"release risk={analysis.release_risk}."
+                    ),
+                ),
             ],
             duration_ms=duration_ms,
             input_tokens=input_tokens,

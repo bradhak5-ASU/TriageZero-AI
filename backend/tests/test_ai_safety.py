@@ -76,6 +76,20 @@ def test_system_instruction_declares_evidence_untrusted():
     assert "no tools" in SYSTEM_INSTRUCTION.lower()
 
 
+def test_classification_guidance_distinguishes_ui_dependency_and_test_failures():
+    lowered = SYSTEM_INSTRUCTION.lower()
+    assert "missing from the rendered ui" in lowered
+    assert "different hostname" in lowered
+    assert "locator timeout alone is not enough" in lowered
+    # Guidance describes observable signals, never private controlled labels.
+    for private_label in (
+        "frontend_render_failure",
+        "dependency_unavailable",
+        "broken_test_locator",
+    ):
+        assert private_label not in lowered
+
+
 def test_evidence_is_delimited_and_labeled():
     prompt = build_user_prompt(poisoned_package(INJECTION_STRINGS[0]), [])
     assert prompt.count(EVIDENCE_OPEN) == 1

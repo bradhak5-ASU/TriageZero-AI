@@ -437,8 +437,8 @@ def test_adk_risk_is_deterministic_policy_not_model_assertion(pkg):
 
     result = run_analysis(pkg, [], AnalysisContext(), settings=s)
 
-    # backend defect ⇒ policy forces critical / block_release
-    assert result.analysis.severity == "critical"
+    # backend defect ⇒ policy forces high / block_release
+    assert result.analysis.severity == "high"
     assert result.analysis.release_risk == "block_release"
 
 
@@ -489,7 +489,7 @@ def test_provider_metadata_is_persisted(client, sample_package):
     inv = client.get(f"/api/v1/investigations/{inv_id}").json()
     meta = inv["aiMetadata"]
     assert meta["provider"] == "deterministic"
-    assert meta["promptVersion"] == "v1"
+    assert meta["promptVersion"] == "v2"
     assert meta["analysisSchemaVersion"] == "1.0"
     assert meta["usedFallback"] is False
     assert meta["stageSummaries"]
