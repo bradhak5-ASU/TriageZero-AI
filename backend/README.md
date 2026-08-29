@@ -90,3 +90,49 @@ python -m app.evaluation.run --provider deterministic \
 
 `evaluation/` is gitignored and excluded from the Docker image — the private
 oracle must never ship in a runtime container.
+
+## Datastore
+
+Local development uses SQLite. Nothing needs configuring — the file lives at
+`backend/data/triagezero.db`.
+
+The cloud deployment uses **PostgreSQL (Cloud SQL)**, and this is not a
+preference. A Cloud Run container's filesystem is ephemeral: a SQLite database
+written there is destroyed on every restart, redeploy and scale-to-zero, with
+no error to notice. The backend therefore refuses to start with a SQLite URL
+when `APP_ENV` is `staging` or `production`.
+
+```bash
+pip install -e ".[postgres]"      # psycopg driver, only needed for PostgreSQL
+```
+
+`postgres://` and `postgresql://` URLs are rewritten to the psycopg driver
+automatically, so a URL copied from a managed service works unchanged.
+
+### Migrations
+
+Schema changes are applied by an explicit command rather than only on startup,
+so a deploy fails in a step you can read rather than on a user's request:
+
+```bash
+python -m app.db.migrate           # apply
+python -m app.db.migrate --check   # report only, change nothing
+```
+
+It is idempotent, runs in one transaction, and prints counts and index names
+only — never investigation content or credentials.
+
+## Container probes
+
+| Endpoint | Purpose | Touches the database |
+|---|---|---|
+| `/api/v1/livez` | liveness — the process is up | no |
+| `/api/v1/readyz` | readiness — datastore reachable and migrated | yes |
+| `/api/v1/health` | the dashboard's rich status view | yes, heavily |
+
+`livez` and `readyz` are unauthenticated because platform probes carry no
+credentials, and they disclose nothing beyond a fixed status string.
+Point Cloud Run's startup probe at `readyz` and its liveness probe at `livez`;
+`/api/v1/health` is for humans, not for probes.
+
+See [`../docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md) for the full runbook.

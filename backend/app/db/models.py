@@ -21,12 +21,18 @@ class InvestigationRecord(Base):
     # Concurrent submissions carrying the same Idempotency-Key must race in the
     # database rather than creating duplicate investigations. The index is
     # partial so that the many rows with no key (the normal case) stay allowed.
+    # `sqlite_where` and `postgresql_where` are dialect-specific spellings of
+    # the same partial index. Both are declared so a fresh database gets the
+    # identical constraint whichever backend it runs on — SQLite locally,
+    # PostgreSQL in the cloud — and so app.db.migrations has one shape to
+    # reconcile an existing database against.
     __table_args__ = (
         Index(
             IDEMPOTENCY_KEY_INDEX,
             "idempotency_key",
             unique=True,
             sqlite_where=text("idempotency_key IS NOT NULL"),
+            postgresql_where=text("idempotency_key IS NOT NULL"),
         ),
     )
 

@@ -103,6 +103,12 @@ def test_seeding_refuses_production_mode(monkeypatch, tmp_path):
     from app.core.config import get_settings
 
     monkeypatch.setenv("APP_ENV", "production")
+    # production refuses an ephemeral SQLite store, so give it a durable URL;
+    # the seed call below is rejected before anything connects to it.
+    monkeypatch.setenv(
+        "DATABASE_URL", "postgresql+psycopg://u:p@db.internal:5432/triagezero"
+    )
+    monkeypatch.setenv("FRONTEND_ORIGINS", "https://tz.example.com")
     monkeypatch.setenv("API_AUTH_REQUIRED", "true")
     monkeypatch.setenv(
         "INGESTION_API_TOKEN", "seed-test-ingestion-token-0123456789-abcdef"
@@ -114,6 +120,8 @@ def test_seeding_refuses_production_mode(monkeypatch, tmp_path):
     with pytest.raises(SystemExit, match="Refusing to seed"):
         seed(10, 1, database_url=f"sqlite:///{tmp_path}/x.db")
     monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("FRONTEND_ORIGINS", raising=False)
     get_settings.cache_clear()
 
 

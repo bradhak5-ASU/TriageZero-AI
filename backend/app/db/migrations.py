@@ -1,10 +1,21 @@
-"""Schema migrations for the local SQLite store.
+"""Schema migrations for the investigation store.
 
 `Base.metadata.create_all()` creates missing tables but never alters existing
 ones, so a database created by an earlier milestone keeps its old schema even
 after the model changes. The uniqueness guarantee behind Idempotency-Key
 handling is therefore not actually enforced on an upgraded database unless we
-apply it explicitly — that is what this module does.
+apply it explicitly - that is what this module does.
+
+Two backends are supported and must end up with the *same* schema:
+
+- **SQLite** for local development and the test suite.
+- **PostgreSQL** (Cloud SQL) in the cloud, because a Cloud Run container's
+  filesystem is ephemeral - a SQLite file there is silently destroyed on every
+  restart, redeploy and scale-to-zero.
+
+The DDL involved (partial unique index, ADD COLUMN, DROP INDEX IF EXISTS) is
+supported by both, so one implementation covers both; only the column type
+spellings differ, and those are declared per dialect in ``LATER_COLUMNS``.
 
 Everything here is idempotent: running it on a fresh database, on an already
 migrated database, or repeatedly, performs no further changes.
@@ -12,7 +23,7 @@ migrated database, or repeatedly, performs no further changes.
 
 from dataclasses import dataclass
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.engine import Connection, Engine
 
 from app.core.logging import log_event
@@ -25,11 +36,16 @@ TABLE = InvestigationRecord.__tablename__
 # unique index exists, and dropping it makes upgraded schemas match fresh ones.
 LEGACY_INDEX = "ix_investigations_idempotency_key"
 
+#: Dialects this module knows how to migrate. Anything else is left untouched
+#: rather than half-migrated with SQL that may not apply.
+SUPPORTED_DIALECTS = ("sqlite", "postgresql")
+
 
 @dataclass(frozen=True)
 class MigrationReport:
-    """Counts only — never package contents or private evidence."""
+    """Counts only - never package contents or private evidence."""
 
+    dialect: str = ""
     columns_added: tuple[str, ...] = ()
     keys_repaired: int = 0
     rows_cleared: int = 0
@@ -50,39 +66,54 @@ class MigrationReport:
 
 
 def _table_exists(conn: Connection, table: str) -> bool:
-    row = conn.execute(
-        text("SELECT name FROM sqlite_master WHERE type = 'table' AND name = :t"),
-        {"t": table},
-    ).first()
-    return row is not None
+    return inspect(conn).has_table(table)
 
 
 def index_names(conn: Connection, table: str) -> set[str]:
-    return {row[1] for row in conn.execute(text(f"PRAGMA index_list('{table}')"))}
+    """Explicitly created index names on `table`, for either dialect.
 
-
-# Columns added after the first release, with the DDL to create them.
-# ALTER TABLE ... ADD COLUMN is the only schema change SQLite supports well,
-# and it preserves every existing row.
-LATER_COLUMNS: tuple[tuple[str, str], ...] = (
-    ("is_synthetic", "BOOLEAN DEFAULT 0"),
-    ("synthetic_family", "VARCHAR(64)"),
-    ("resolution_json", "TEXT"),
-)
+    The inspector is used rather than SQLite's ``PRAGMA index_list`` so the
+    same call works on PostgreSQL. It also omits the implicit indexes a UNIQUE
+    constraint creates, which are not ours to reconcile.
+    """
+    return {
+        str(row["name"]) for row in inspect(conn).get_indexes(table) if row.get("name")
+    }
 
 
 def _column_names(conn: Connection, table: str) -> set[str]:
-    return {row[1] for row in conn.execute(text(f"PRAGMA table_info(\'{table}\')"))}
+    return {str(row["name"]) for row in inspect(conn).get_columns(table)}
 
 
-def _add_missing_columns(conn: Connection) -> tuple[str, ...]:
+# Columns added after the first release, with the DDL to create them per
+# dialect. ADD COLUMN preserves every existing row on both backends.
+# Boolean literals differ: SQLite stores 0/1, PostgreSQL requires FALSE.
+LATER_COLUMNS: tuple[tuple[str, dict[str, str]], ...] = (
+    (
+        "is_synthetic",
+        {"sqlite": "BOOLEAN DEFAULT 0", "postgresql": "BOOLEAN DEFAULT FALSE"},
+    ),
+    (
+        "synthetic_family",
+        {"sqlite": "VARCHAR(64)", "postgresql": "VARCHAR(64)"},
+    ),
+    (
+        "resolution_json",
+        {"sqlite": "TEXT", "postgresql": "TEXT"},
+    ),
+)
+
+
+def _add_missing_columns(conn: Connection, dialect: str) -> tuple[str, ...]:
     """Add columns introduced after this database was created."""
     existing = _column_names(conn, TABLE)
     added: list[str] = []
-    for name, ddl in LATER_COLUMNS:
-        if name not in existing:
-            conn.execute(text(f"ALTER TABLE {TABLE} ADD COLUMN {name} {ddl}"))
-            added.append(name)
+    for name, ddl_by_dialect in LATER_COLUMNS:
+        if name in existing:
+            continue
+        ddl = ddl_by_dialect[dialect]
+        conn.execute(text(f"ALTER TABLE {TABLE} ADD COLUMN {name} {ddl}"))
+        added.append(name)
     return tuple(added)
 
 
@@ -120,7 +151,7 @@ def _repair_duplicate_keys(conn: Connection) -> tuple[int, int]:
 
     Ordering is (created_at, id) so the outcome is deterministic even when two
     rows share a timestamp. Investigations are never deleted and nothing else
-    about them is touched — only the duplicate key is set to NULL, which is the
+    about them is touched - only the duplicate key is set to NULL, which is the
     state a request without an Idempotency-Key would have produced.
     """
     keys = _duplicate_keys(conn)
@@ -136,7 +167,7 @@ def _repair_duplicate_keys(conn: Connection) -> tuple[int, int]:
                 {"k": key},
             )
         ]
-        losers = ids[1:]  # ids[0] is the oldest — it keeps the key
+        losers = ids[1:]  # ids[0] is the oldest - it keeps the key
         for loser in losers:
             conn.execute(
                 text(f"UPDATE {TABLE} SET idempotency_key = NULL WHERE id = :id"),
@@ -146,21 +177,28 @@ def _repair_duplicate_keys(conn: Connection) -> tuple[int, int]:
     return len(keys), rows_cleared
 
 
-def run_sqlite_migrations(engine: Engine) -> MigrationReport:
-    """Bring an existing SQLite database up to the current intended schema.
+def run_migrations(engine: Engine) -> MigrationReport:
+    """Bring an existing database up to the current intended schema.
 
-    Applied in one transaction: repair duplicate keys first (a unique index
-    cannot be built over duplicates), then create the named partial unique
-    index, then drop the redundant legacy index.
+    Applied in one transaction: add columns introduced later, repair duplicate
+    keys (a unique index cannot be built over duplicates), create the named
+    partial unique index, reconcile secondary indexes, then drop the redundant
+    legacy index.
+
+    A single transaction matters more on PostgreSQL than on SQLite: DDL is
+    transactional there, so a failure part-way through leaves the database on
+    the old schema rather than in a half-migrated state.
     """
-    if engine.dialect.name != "sqlite":
-        return MigrationReport()
+    dialect = engine.dialect.name
+    if dialect not in SUPPORTED_DIALECTS:
+        return MigrationReport(dialect=dialect)
 
     with engine.begin() as conn:
         if not _table_exists(conn, TABLE):
-            return MigrationReport()
+            # create_all() will have made the table with the current schema.
+            return MigrationReport(dialect=dialect)
 
-        columns_added = _add_missing_columns(conn)
+        columns_added = _add_missing_columns(conn, dialect)
 
         existing = index_names(conn, TABLE)
         needs_index = IDEMPOTENCY_KEY_INDEX not in existing
@@ -182,6 +220,7 @@ def run_sqlite_migrations(engine: Engine) -> MigrationReport:
             conn.execute(text(f"DROP INDEX IF EXISTS {LEGACY_INDEX}"))
 
         report = MigrationReport(
+            dialect=dialect,
             columns_added=columns_added,
             keys_repaired=keys_repaired,
             rows_cleared=rows_cleared,
@@ -192,7 +231,8 @@ def run_sqlite_migrations(engine: Engine) -> MigrationReport:
 
     if report.changed:
         log_event(
-            "sqlite schema migrated",
+            "database schema migrated",
+            dialect=report.dialect,
             index_created=report.index_created,
             legacy_index_dropped=report.legacy_index_dropped,
             columns_added=len(report.columns_added),
@@ -201,3 +241,7 @@ def run_sqlite_migrations(engine: Engine) -> MigrationReport:
             secondary_indexes_created=len(report.secondary_indexes_created),
         )
     return report
+
+
+#: Retained name from the SQLite-only milestone. Same behavior, both dialects.
+run_sqlite_migrations = run_migrations
