@@ -95,7 +95,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Hand the API client a token getter. getIdToken() refreshes automatically
   // when the token is close to expiry, so requests carry a fresh credential
   // without us managing timers.
-  useEffect(() => {
+  //
+  // This registers during RENDER, not in an effect, and that is deliberate.
+  // React runs child effects before parent effects, so an effect here would be
+  // installed only AFTER InvestigationsProvider had already mounted and fired
+  // its first fetch - which then went out with no Authorization header and
+  // came back 401 ("A bearer token is required for this API operation"),
+  // while a manual Retry succeeded because the provider existed by then.
+  // A parent renders before its children, so registering here cannot lose that
+  // race. The getter reads currentUser at call time, so it stays correct as
+  // the session changes and never needs re-registering.
+  useMemo(() => {
     if (!configured) {
       setAuthTokenProvider(null);
       return;
@@ -110,8 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
       }
     });
-    return () => setAuthTokenProvider(null);
-  }, [configured, user]);
+  }, [configured]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const auth = getFirebaseAuth();

@@ -50,3 +50,6 @@ _to_delete/
 deploy.env
 *.deploy.env
 DEPLOY_RESUME.txt
+
+# scratch build context staged from the read-only NovaCart repo
+deploy/.novacart-build/

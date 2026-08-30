@@ -6,6 +6,7 @@
  * a loading state that does not flash the wrong screen, a real sign-in gate,
  * token attachment on API calls, and no credential leaking into the DOM.
  */
+import { useEffect } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -235,6 +236,42 @@ describe('API token attachment', () => {
     const [, init] = fetchMock.mock.calls[0];
     expect(init.body).not.toContain('ID-TOKEN-123');
     expect(init.headers.authorization).toBe('Bearer ID-TOKEN-123');
+  });
+});
+
+describe('token registration ordering', () => {
+  it('attaches the token on a child\'s very first request, with no retry', async () => {
+    // Regression: the token provider was registered in an effect on
+    // AuthProvider. React runs CHILD effects before PARENT effects, so a
+    // provider mounted underneath fired its first fetch before the token
+    // getter existed - the request went out bare and the dashboard showed
+    // "A bearer token is required for this API operation", while pressing
+    // Retry succeeded because by then it was registered.
+    authState.user = { email: 'demo@example.com', getIdToken: async () => 'FIRST-CALL-TOKEN' };
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true, status: 200, statusText: 'OK', json: () => Promise.resolve([]),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    // A child that calls the API from its mount effect, exactly as
+    // InvestigationsProvider does.
+    function FetchesOnMount() {
+      useEffect(() => {
+        void httpApi.listInvestigations();
+      }, []);
+      return <div>child</div>;
+    }
+
+    render(
+      <AuthProvider>
+        <FetchesOnMount />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers.authorization).toBe('Bearer FIRST-CALL-TOKEN');
   });
 });
 
