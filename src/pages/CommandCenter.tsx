@@ -152,6 +152,11 @@ export function CommandCenter() {
         </div>
       </div>
 
+      {/* No trend/delta props here on purpose. They were previously hardcoded
+          ("+3 since midnight", "-14s") and rendered next to real values, which
+          meant an empty dashboard confidently reported changes that had not
+          happened. A delta may only be shown once the API returns a real
+          prior-period comparison to compute it from. */}
       <div className="kpi-grid">
         <KpiCard
           label="Investigations today"
@@ -159,7 +164,6 @@ export function CommandCenter() {
           caption="since midnight"
           tooltip="Failure packages received and investigated since local midnight."
           icon={<Activity size={15} aria-hidden style={{ color: 'var(--accent)' }} />}
-          trend={{ direction: 'up', text: '+3', positive: false }}
         />
         <KpiCard
           label="Currently processing"
@@ -167,7 +171,6 @@ export function CommandCenter() {
           caption="in pipeline"
           tooltip="Investigations currently received, queued, or under analysis."
           icon={<Sparkles size={15} aria-hidden style={{ color: 'var(--ai)' }} />}
-          trend={{ direction: 'flat', text: 'steady' }}
         />
         <KpiCard
           label="Block-release failures"
@@ -175,7 +178,6 @@ export function CommandCenter() {
           caption="require sign-off"
           tooltip="Open investigations whose release risk is assessed as block_release."
           icon={<ShieldAlert size={15} aria-hidden style={{ color: 'var(--crit)' }} />}
-          trend={{ direction: 'up', text: '+1', positive: false }}
         />
         <KpiCard
           label="Average confidence"
@@ -183,7 +185,6 @@ export function CommandCenter() {
           caption="across classified"
           tooltip="Mean model confidence across investigations with a classification."
           icon={<BrainCircuit size={15} aria-hidden style={{ color: 'var(--ai)' }} />}
-          trend={{ direction: 'up', text: '+2pts', positive: true }}
         />
         <KpiCard
           label="Mean investigation time"
@@ -191,7 +192,6 @@ export function CommandCenter() {
           caption="receipt → recommendation"
           tooltip="Average wall-clock time from failure receipt to recommendation."
           icon={<Timer size={15} aria-hidden style={{ color: 'var(--info)' }} />}
-          trend={{ direction: 'down', text: '-14s', positive: true }}
         />
         <KpiCard
           label="Automated actions"
@@ -199,7 +199,6 @@ export function CommandCenter() {
           caption="executed after approval"
           tooltip="Actions executed by the agent after passing the approval policy."
           icon={<CheckCheck size={15} aria-hidden style={{ color: 'var(--ok)' }} />}
-          trend={{ direction: 'up', text: '+2', positive: true }}
         />
       </div>
 
