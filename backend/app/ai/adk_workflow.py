@@ -143,6 +143,44 @@ READ_ONLY_TOOLS: tuple[Callable[..., Any], ...] = (
 )
 
 
+def _required_result_contract() -> str:
+    """The exact JSON contract, generated from ModelAnalysis itself.
+
+    Removing output_schema (see build_adk_agent) left the agent with no idea
+    what shape to return: it converged and answered, but the answer failed
+    validation with invalid_schema every time. Spelling the contract out in the
+    instruction fixes that, and deriving it from the model rather than writing
+    it by hand means it cannot drift out of step with the schema that will
+    judge the reply.
+    """
+    schema = ModelAnalysis.model_json_schema()
+    props = schema.get("properties", {})
+    lines: list[str] = []
+    for name, spec in props.items():
+        allowed = spec.get("enum")
+        if allowed is None and "$ref" not in str(spec):
+            for sub in spec.get("anyOf", []) or []:
+                if "enum" in sub:
+                    allowed = sub["enum"]
+                    break
+        kind = spec.get("type", "string")
+        if allowed:
+            lines.append(f"  {name}: one of {allowed}")
+        elif kind == "array":
+            lines.append(f"  {name}: array of short strings")
+        elif kind == "number":
+            lines.append(f"  {name}: number between 0 and 1")
+        elif kind == "boolean":
+            lines.append(f"  {name}: true or false")
+        else:
+            lines.append(f"  {name}: string")
+    # enums declared via Literal land in $defs rather than inline
+    for def_name, definition in (schema.get("$defs") or {}).items():
+        if "enum" in definition:
+            lines.append(f"  # {def_name} allowed values: {definition['enum']}")
+    return "\n".join(lines)
+
+
 def build_adk_agent(model: str) -> Any:
     """Construct the real ADK agent. Imported lazily — never at module import."""
     try:
@@ -162,9 +200,11 @@ def build_adk_agent(model: str) -> Any:
             "required structured result.\n\n"
             "STOPPING RULE: call each tool at most once, then STOP calling tools "
             "and reply with the JSON object and nothing else - no prose, no code "
-            "fence, no further tool calls. A reply that is not a single JSON "
-            "object is discarded and the investigation falls back to the rule "
-            "engine. The application validates ModelAnalysis before persistence."
+            "fence, no further tool calls.\n\n"
+            "REQUIRED KEYS. Return EXACTLY these keys, no more and no fewer. "
+            "Any extra key - including anything resembling reasoning or "
+            "commentary - is rejected and the investigation falls back to the "
+            "rule engine:\n" + _required_result_contract()
         ),
         tools=list(READ_ONLY_TOOLS),
         # output_schema is deliberately NOT set alongside tools.

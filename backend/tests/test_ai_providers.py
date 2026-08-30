@@ -554,6 +554,29 @@ def test_tool_using_adk_agent_has_one_structured_output_path():
     assert "validate_result" not in tool_names
 
 
+def test_adk_instruction_states_every_required_key():
+    """Without output_schema the instruction is the only thing telling the agent
+    what shape to return.
+
+    ADK converged and answered but failed validation with invalid_schema on
+    every investigation, because nothing told it the required keys. The
+    contract is generated from ModelAnalysis so it cannot drift; this asserts
+    the generated text actually reaches the agent and covers every field.
+    """
+    from app.ai.adk_workflow import build_adk_agent
+    from app.ai.schemas import ModelAnalysis
+
+    instruction = build_adk_agent("gemini-3.6-flash").instruction
+
+    for field in ModelAnalysis.model_fields:
+        assert field in instruction, f"{field} is not stated in the ADK instruction"
+
+    # the closed vocabulary must be spelled out, not merely referred to
+    assert "backend_application_defect" in instruction
+    assert "block_release" in instruction
+    assert "no more and no fewer" in instruction
+
+
 # --- persistence of provider metadata --------------------------------------
 
 
