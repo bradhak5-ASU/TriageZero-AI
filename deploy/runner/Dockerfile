@@ -4,7 +4,14 @@
 # The Playwright base image already contains the browsers and their system
 # libraries. Installing them at container start instead would add minutes to
 # every scheduled run and depend on the network staying up.
-FROM mcr.microsoft.com/playwright:v1.46.1-jammy
+# The browsers in this image must match the Playwright version the suite
+# resolves to, or every test dies with "Executable doesn't exist". The suite
+# declares a caret range, so that version moves on its own - it resolved to
+# 1.62.1 while this image was pinned to 1.46.1. build-runner.sh reads the
+# actual version out of the suite's lockfile and passes it in, so the image
+# tracks the suite instead of a guess made at authoring time.
+ARG PLAYWRIGHT_VERSION=1.46.1
+FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-jammy
 
 WORKDIR /suite
 

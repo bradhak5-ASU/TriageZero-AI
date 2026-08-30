@@ -24,8 +24,36 @@ cp "$HERE/runner/Dockerfile" "$HERE/runner/run.sh" "$CTX/"
 rsync -a --exclude node_modules --exclude test-results --exclude .git \
       --exclude playwright-report "$SRC/" "$CTX/suite/"
 
+# Read the version the suite actually resolves to, so the base image always
+# carries the matching browsers.
+PW_VERSION="$(python3 -c "
+import json,sys
+d=json.load(open('$CTX/suite/package-lock.json'))
+print(d['packages']['node_modules/@playwright/test']['version'])
+" 2>/dev/null || echo "")"
+if [ -z "$PW_VERSION" ]; then
+  echo "ERROR: could not read the Playwright version from the suite lockfile."
+  echo "       Without it the image would ship mismatched browsers."
+  exit 1
+fi
+echo "==> playwright version from lockfile: $PW_VERSION"
+
+cat > "$CTX/cloudbuild.yaml" <<YAML
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - '$IMAGE'
+      - --build-arg
+      - 'PLAYWRIGHT_VERSION=$PW_VERSION'
+      - .
+images:
+  - '$IMAGE'
+YAML
+
 echo "==> building $IMAGE"
-gcloud builds submit "$CTX" --project="$PROJECT" --tag="$IMAGE"
+gcloud builds submit "$CTX" --project="$PROJECT" --config="$CTX/cloudbuild.yaml"
 
 echo "==> deploying job"
 gcloud run jobs deploy triagezero-scheduled-tests \
