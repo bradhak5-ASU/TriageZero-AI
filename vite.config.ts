@@ -12,6 +12,10 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // Playwright suites are staged under deploy/.runner-build when the Cloud
+    // Run test-job image is assembled. Keep Vitest scoped to dashboard unit
+    // and component tests so generated end-to-end specs are never collected.
+    include: ['src/test/**/*.{test,spec}.{ts,tsx}'],
     setupFiles: './src/test/setup.ts',
     css: false,
   },
