@@ -30,3 +30,9 @@ deploy.env
 DEPLOY_RESUME.txt
 
 .DS_Store
+
+# scratch build contexts staged from the read-only NovaCart repo. These hold
+# another project's source and test suite; uploading them makes this build lint
+# and type-check code that is not ours.
+deploy/.novacart-build/
+deploy/.runner-build/

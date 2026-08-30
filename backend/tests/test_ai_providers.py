@@ -526,16 +526,30 @@ def test_adk_tools_are_read_only():
 
 
 def test_tool_using_adk_agent_has_one_structured_output_path():
-    """The ADK owns final-response shaping while the application validates the
-    same closed schema again. ``validate_result`` must not also be a tool: two
-    schema tools caused Vertex to finish with an empty object.
+    """The application owns schema enforcement; the agent owns investigation.
+
+    This previously asserted ``agent.output_schema is ModelAnalysis``. Binding
+    an output schema alongside tools is what broke ADK in production: the model
+    emitted function_call parts indefinitely and never produced a final
+    schema-shaped response, so every investigation stalled at
+    stage=evidence_normalized without even timing out. Cloud Logging showed an
+    unbroken run of "Sending out request" and "there are non-text parts in the
+    response: ['function_call']".
+
+    Dropping output_schema loses nothing: the runner parses the JSON and the
+    application validates ModelAnalysis before persisting. ``validate_result``
+    must still not be registered as a tool - two competing structured-output
+    paths made Vertex finish with an empty object.
     """
     from app.ai.adk_workflow import build_adk_agent
-    from app.ai.schemas import ModelAnalysis
 
     agent = build_adk_agent("gemini-3.6-flash")
 
-    assert agent.output_schema is ModelAnalysis
+    assert getattr(agent, "output_schema", None) is None, (
+        "an output schema bound alongside tools prevents the agent from ever "
+        "returning a final response"
+    )
+    assert agent.tools, "the agent must keep its read-only evidence tools"
     tool_names = {getattr(tool, "name", getattr(tool, "__name__", "")) for tool in agent.tools}
     assert "validate_result" not in tool_names
 

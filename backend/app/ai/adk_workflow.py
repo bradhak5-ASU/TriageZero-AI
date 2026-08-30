@@ -159,16 +159,26 @@ def build_adk_agent(model: str) -> Any:
             + "\n\nWORKFLOW: use the read-only tools to inspect network, console and "
             "failure text; correlate sanitized similar cases; call calculate_risk for "
             "severity and release risk (never assert them yourself); then return the "
-            "required structured result. The ADK enforces ModelAnalysis on the final "
-            "response, and the application validates it again before persistence."
+            "required structured result.\n\n"
+            "STOPPING RULE: call each tool at most once, then STOP calling tools "
+            "and reply with the JSON object and nothing else - no prose, no code "
+            "fence, no further tool calls. A reply that is not a single JSON "
+            "object is discarded and the investigation falls back to the rule "
+            "engine. The application validates ModelAnalysis before persistence."
         ),
         tools=list(READ_ONLY_TOOLS),
-        # google-adk 1.35+ supports tools and output_schema together. It keeps
-        # the evidence tools available during the investigation loop and
-        # constrains only the final model response. Do not also register our
-        # validate_result helper as a tool: that creates a second, competing
-        # structured-output path and can end the Vertex turn with an empty {}.
-        output_schema=ModelAnalysis,
+        # output_schema is deliberately NOT set alongside tools.
+        #
+        # With both bound, the model kept emitting function_call parts and never
+        # produced a final schema-shaped response - Cloud Logging showed an
+        # unbroken run of "Sending out request" with "there are non-text parts
+        # in the response: ['function_call']", and every investigation stalled
+        # at stage=evidence_normalized, never timing out cleanly.
+        #
+        # Nothing is lost by dropping it: _parse_payload strips code fences and
+        # parses the JSON, and ModelAnalysis is validated by the application
+        # before anything is persisted. The schema still decides what is
+        # acceptable; it just no longer has to terminate the tool loop as well.
     )
 
 
@@ -281,11 +291,24 @@ class GoogleAdkRunner:
         input_tokens = 0
         output_tokens = 0
         message = types.Content(role="user", parts=[types.Part.from_text(text=prompt)])
+        # A looping agent should fail fast and fall back rather than consume the
+        # whole deadline. Five tools plus a final answer needs far fewer turns
+        # than this, so exceeding it means the model is not converging.
+        max_events = 40
+        seen_events = 0
         try:
             async with asyncio.timeout(self._timeout):
                 async for event in self._runner.run_async(
                     user_id=user_id, session_id=session_id, new_message=message
                 ):
+                    seen_events += 1
+                    if seen_events > max_events:
+                        log_event("adk exceeded event budget", events=seen_events)
+                        raise AnalyzerError(
+                            "no_convergence",
+                            "ADK kept calling tools without returning a result",
+                            retryable=True,
+                        )
                     usage = getattr(event, "usage_metadata", None)
                     input_tokens += int(getattr(usage, "prompt_token_count", 0) or 0)
                     output_tokens += int(getattr(usage, "candidates_token_count", 0) or 0)
