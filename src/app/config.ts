@@ -7,6 +7,7 @@ export const config = {
   appName: 'TriageZero',
   tagline: 'Autonomous Failure Intelligence',
   version: '0.1.0',
-  build: 'frontend-demo',
-  artifactRetentionDays: 30,
+  // artifactRetentionDays was here and was displayed as "30 days (configured
+  // server-side)". The frontend has no way to know the server's retention
+  // policy, so it was simply asserting a number. Removed rather than guessed.
 } as const;

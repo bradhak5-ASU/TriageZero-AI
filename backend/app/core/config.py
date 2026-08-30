@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     # Humans sign in through Firebase and send a short-lived ID token; machines
     # keep using INGESTION_API_TOKEN. The two are verified independently.
     # Disabled by default so local development and tests need no Firebase project.
+    # Where this instance runs. Cloud Run does not expose its region in the
+    # environment, so it is injected at deploy time. Blank means local.
+    deployment_region: str = ""
+
     firebase_auth_enabled: bool = False
     firebase_project_id: str = ""
 

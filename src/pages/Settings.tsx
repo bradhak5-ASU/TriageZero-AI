@@ -44,8 +44,6 @@ export function Settings() {
                     <span className="badge badge--ok">Disabled — live API</span>
                   )}
                 </dd>
-                <dt>Artifact retention</dt>
-                <dd>{config.artifactRetentionDays} days (configured server-side)</dd>
               </dl>
               <p className="faint" style={{ fontSize: 12, display: 'flex', gap: 7, alignItems: 'flex-start' }}>
                 <Info size={13} aria-hidden style={{ flexShrink: 0, marginTop: 2 }} />
@@ -177,9 +175,7 @@ export function Settings() {
                   {config.appName} — {config.tagline}
                 </dd>
                 <dt>Version</dt>
-                <dd className="mono">
-                  {config.version} · {config.build}
-                </dd>
+                <dd className="mono">{config.version}</dd>
                 <dt>Pipeline</dt>
                 <dd className="muted">
                   Playwright evidence → ingestion → Gemini + Google ADK analysis → recommendation

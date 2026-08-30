@@ -231,6 +231,23 @@ export function TopBar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
           >
             {(email ?? 'U').slice(0, 2).toUpperCase()}
           </span>
+          {/* The signed-in address was previously only in a title attribute, so
+              it took a deliberate hover to discover who was signed in. On a
+              shared demo machine that is the first thing a person checks. */}
+          {email && (
+            <span
+              className="desktop-only muted"
+              style={{
+                fontSize: 12,
+                maxWidth: 180,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {email}
+            </span>
+          )}
           <button
             type="button"
             className="icon-btn"

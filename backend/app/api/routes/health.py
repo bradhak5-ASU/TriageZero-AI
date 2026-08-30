@@ -15,11 +15,14 @@ from app.schemas.health import HealthOut
 
 router = APIRouter()
 
+# Adapters that are deliberately not wired up. The details must not describe a
+# local SQLite deployment, because this same endpoint serves the Cloud Run
+# deployment, where saying "SQLite provides local persistence" is simply false.
 DISABLED_SERVICES = [
-    ("pubsub", "Pub/Sub", "Local in-process dispatcher is used instead"),
-    ("firestore", "Firestore", "SQLite provides local persistence"),
-    ("storage", "Cloud Storage", "Artifacts are metadata-only locally"),
-    ("github", "GitHub Integration", "Issue creation not connected — decisions are recorded only"),
+    ("pubsub", "Pub/Sub", "Not connected — an in-process dispatcher handles queueing"),
+    ("firestore", "Firestore", "Not connected — the relational store holds investigations"),
+    ("storage", "Cloud Storage", "Not connected — artifacts are recorded as metadata only"),
+    ("github", "GitHub Integration", "Not connected — decisions are recorded, no issues created"),
 ]
 
 
@@ -145,7 +148,6 @@ def get_health(session: SessionDep) -> HealthOut:
         r.status == "failed" and (r.completed_at or "") >= _iso(now - timedelta(hours=1))
         for r in recent
     )
-    overall = "degraded" if failed_last_hour else "healthy"
     last_check = _iso(now)
 
     settings = get_settings()
@@ -158,40 +160,60 @@ def get_health(session: SessionDep) -> HealthOut:
     dataset_dir = Path(__file__).resolve().parents[3] / "evaluation" / "datasets"
     datasets = sorted(p.name for p in dataset_dir.glob("*.json")) if dataset_dir.is_dir() else []
 
+    # The datastore row must describe the store actually in use. This endpoint
+    # previously hardcoded "SQLite Store / Durable local persistence", which is
+    # wrong and misleading on the Cloud Run deployment backed by Cloud SQL.
+    backend_name = settings.database_backend
+    if backend_name == "postgresql":
+        store_name = "PostgreSQL Store"
+        store_detail = "Managed PostgreSQL — durable across restarts and redeploys"
+    elif backend_name == "sqlite":
+        store_name = "SQLite Store"
+        store_detail = "Local file persistence — for development only"
+    else:
+        store_name = f"{backend_name} Store"
+        store_detail = "Relational persistence for investigations"
+
+    # Cloud Run does not publish its region to the process, so it is injected at
+    # deploy time. Reporting "local" everywhere while running in us-central1 was
+    # a plain misstatement.
+    region = settings.deployment_region or ("local" if settings.app_env == "development" else "—")
+
     services = [
         {
             "id": "ingestion-api",
             "name": "Ingestion API",
             "status": "healthy",
-            "latencyMs": db_latency_ms,
+            # No separate latency probe exists for this service. The database
+            # round trip was previously reported here as if it were one, which
+            # is why three rows showed an identical figure.
             "lastCheck": last_check,
-            "region": "local",
+            "region": region,
             "detail": "Accepting failure packages on /api/v1/investigations",
         },
         {
             "id": "worker",
             "name": "Investigation Worker",
             "status": "healthy",
-            "latencyMs": db_latency_ms,
             "lastCheck": last_check,
-            "region": "local",
+            "region": region,
             "detail": f"In-process dispatcher · {queue_depth} active",
         },
         {
             "id": "database",
-            "name": "SQLite Store",
+            "name": store_name,
             "status": "healthy",
-            "latencyMs": db_latency_ms,
+            "latencyMs": db_latency_ms,  # the one figure actually measured
             "lastCheck": last_check,
-            "region": "local",
-            "detail": "Durable local persistence for investigations",
+            "region": region,
+            "detail": store_detail,
         },
         {
             "id": "analyzer",
             "name": "Deterministic Analyzer",
             "status": "healthy",
             "lastCheck": last_check,
-            "region": "local",
+            "region": region,
             "detail": "Evidence-driven rule engine — always available as fallback",
         },
         *ai_services,
@@ -207,6 +229,12 @@ def get_health(session: SessionDep) -> HealthOut:
             for sid, name, detail in DISABLED_SERVICES
         ],
     ]
+
+    # Overall status is derived from the rows themselves. Previously it only
+    # considered recently failed investigations, so the banner could read
+    # "Healthy" while the table directly below showed a degraded provider.
+    any_degraded = any(svc.get("status") == "degraded" for svc in services)
+    overall = "degraded" if (failed_last_hour or any_degraded) else "healthy"
 
     return HealthOut.model_validate(
         {

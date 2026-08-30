@@ -156,7 +156,7 @@ steps:
       # credentials (roles/aiplatform.user). No API key exists to store or leak,
       # and the spend lands on this project's billing rather than a separate
       # API quota.
-      - '--set-env-vars=APP_ENV=production,FRONTEND_ORIGINS=${_WEB_ORIGIN},ANALYZER_MODE=gemini,API_AUTH_REQUIRED=true,FIREBASE_AUTH_ENABLED=true,FIREBASE_PROJECT_ID=${PROJECT_ID},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_LOCATION=${_GENAI_LOCATION}'
+      - '--set-env-vars=APP_ENV=production,FRONTEND_ORIGINS=${_WEB_ORIGIN},ANALYZER_MODE=gemini,API_AUTH_REQUIRED=true,FIREBASE_AUTH_ENABLED=true,FIREBASE_PROJECT_ID=${PROJECT_ID},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_LOCATION=${_GENAI_LOCATION},DEPLOYMENT_REGION=${_REGION}'
       - '--set-secrets=DATABASE_URL=triagezero-database-url:latest,INGESTION_API_TOKEN=triagezero-ingestion-token:latest,DASHBOARD_API_TOKEN=triagezero-dashboard-token:latest'
       - '--service-account=triagezero-api@${PROJECT_ID}.iam.gserviceaccount.com'
       # Scale-to-zero is fine for a demo, but a cold start that also has to

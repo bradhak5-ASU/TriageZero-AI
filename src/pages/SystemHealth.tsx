@@ -262,6 +262,9 @@ export function SystemHealth() {
           </div>
           <div className="card__body card__body--flush">
             <ul style={{ listStyle: 'none', margin: 0, padding: '6px 0' }}>
+              {snapshot.events.length === 0 && (
+                <li className="muted">No system events recorded yet.</li>
+              )}
               {snapshot.events.map((e) => (
                 <li
                   key={e.id}
