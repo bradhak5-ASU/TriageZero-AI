@@ -1,12 +1,20 @@
-node_modules/
-dist/
-backend/
-docs/
-.git/
-test-results/
-coverage/
-*.md
+# Same intent as .gcloudignore, for local `docker compose build`.
+# node_modules must never enter the image: it is installed inside the
+# container for the container's platform.
+node_modules
+**/node_modules
+dist
+*.tsbuildinfo
+.git
+backend/.venv
+**/__pycache__
+*.pyc
+*.egg-info
+backend/data
+_to_delete
+*.tgz
 .env
 .env.*
-!.env.example
-*.tar.gz
+deploy.env
+DEPLOY_RESUME.txt
+.DS_Store

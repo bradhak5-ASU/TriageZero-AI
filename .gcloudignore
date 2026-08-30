@@ -1,0 +1,32 @@
+# What NOT to upload to Cloud Build.
+#
+# Without this file the whole working directory is uploaded, which is slow and
+# - worse - lets Dockerfile.frontend's `COPY . .` overwrite the Linux
+# node_modules that `npm ci` just installed with the host's macOS ones. The
+# darwin-arm64 native bindings then fail to load inside the Linux container.
+.gcloudignore
+.git
+.gitignore
+
+# dependencies and build output - rebuilt inside the image
+node_modules/
+**/node_modules/
+dist/
+*.tsbuildinfo
+backend/.venv/
+**/__pycache__/
+*.pyc
+*.egg-info/
+
+# local data and scratch
+backend/data/
+_to_delete/
+*.tgz
+
+# never upload anything holding real values
+.env
+.env.*
+deploy.env
+DEPLOY_RESUME.txt
+
+.DS_Store
