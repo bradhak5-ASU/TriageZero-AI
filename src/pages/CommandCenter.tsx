@@ -28,7 +28,6 @@ import {
   RiskBadge,
   SeverityBadge,
 } from '../components/ui/StatusBadge';
-import { topFailingComponents, weeklyTrend } from '../data/mockInvestigations';
 import {
   formatConfidence,
   formatDuration,
@@ -95,6 +94,59 @@ export function CommandCenter() {
     return [...counts.entries()]
       .sort((a, b) => b[1] - a[1])
       .map(([cls, count]) => ({ name: CLASSIFICATION_META[cls].label, count }));
+  }, [items]);
+
+  // Both of these were previously imported from mockInvestigations and rendered
+  // as if they were live: a fixed [6,9,4,11,7,13,8] week and an invented list of
+  // components. They are derived from the real investigations now, so an empty
+  // database produces empty panels rather than confident fiction.
+  const weeklyTrend = useMemo(() => {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    const buckets: Array<{ label: string; count: number }> = [];
+    for (let back = 6; back >= 0; back--) {
+      const from = new Date(midnight.getTime() - back * 86_400_000);
+      const to = new Date(from.getTime() + 86_400_000);
+      const count = items.filter((inv) => {
+        const at = new Date(inv.createdAt);
+        return at >= from && at < to;
+      }).length;
+      buckets.push({ label: dayNames[from.getDay()], count });
+    }
+    return buckets;
+  }, [items]);
+
+  /** Which part of the system each failure implicated, from its own evidence. */
+  const topFailingComponents = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const inv of items) {
+      const failing = inv.evidence?.network?.find(
+        (n) => typeof n.status === 'number' && n.status >= 400,
+      );
+      let name: string;
+      if (failing) {
+        // the failing endpoint is the most specific real signal available
+        try {
+          const url = new URL(failing.url);
+          const segment = url.pathname.split('/').filter(Boolean).pop();
+          name = segment
+            ? `${inv.repository} \u00b7 ${segment}`
+            : `${inv.repository} \u00b7 ${url.hostname}`;
+        } catch {
+          name = inv.repository;
+        }
+      } else {
+        // no failing request: attribute it to the test itself, not to a guess
+        const file = inv.testFile.split('/').pop() ?? inv.testFile;
+        name = `test suite \u00b7 ${file.replace(/\.spec\.[tj]sx?$/, '')}`;
+      }
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, count]) => ({ name, count }));
   }, [items]);
 
   const riskSegments = useMemo(() => {
@@ -353,7 +405,11 @@ export function CommandCenter() {
             <h2>7-day investigation trend</h2>
           </div>
           <div className="card__body">
-            <ColumnsChart data={weeklyTrend} ariaLabel="Investigations per day over the last week" />
+            {items.length === 0 ? (
+              <p className="muted">No investigations in the last 7 days.</p>
+            ) : (
+              <ColumnsChart data={weeklyTrend} ariaLabel="Investigations per day over the last week" />
+            )}
           </div>
         </div>
         <div className="card">
@@ -361,10 +417,14 @@ export function CommandCenter() {
             <h2>Top failing components</h2>
           </div>
           <div className="card__body">
-            <BarList
-              items={topFailingComponents.map((c) => ({ ...c, color: 'var(--warn)' }))}
-              ariaLabel="Most frequently implicated components"
-            />
+            {topFailingComponents.length === 0 ? (
+              <p className="muted">No components implicated yet.</p>
+            ) : (
+              <BarList
+                items={topFailingComponents.map((c) => ({ ...c, color: 'var(--warn)' }))}
+                ariaLabel="Most frequently implicated components"
+              />
+            )}
           </div>
         </div>
       </div>
