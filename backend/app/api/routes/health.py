@@ -75,6 +75,7 @@ def _ai_service_states(settings, telemetry_snapshot: dict) -> tuple[list[dict], 
         "unverified": "Configured, but no successful provider call has been verified yet",
         "healthy": "Configured and answering",
     }
+    adk_active = adk_state not in ("disabled", "unconfigured")
     return (
         [
             {
@@ -92,7 +93,15 @@ def _ai_service_states(settings, telemetry_snapshot: dict) -> tuple[list[dict], 
                 "name": "Google ADK",
                 "status": _service_status(adk_state),
                 "lastCheck": None,
-                "region": "local",
+                # ADK runs in-process, so it has no region of its own. It said
+                # "local" while every other row correctly reported us-central1,
+                # which is the same misstatement the rest of this endpoint had.
+                # A disabled adapter has nowhere to be.
+                "region": (
+                    settings.google_cloud_location
+                    if adk_active and settings.google_genai_use_vertexai
+                    else "—"
+                ),
                 "detail": detail_map[adk_state],
             },
         ],
