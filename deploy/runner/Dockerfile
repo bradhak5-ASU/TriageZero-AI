@@ -13,7 +13,11 @@
 ARG PLAYWRIGHT_VERSION=1.46.1
 FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-jammy
 
-WORKDIR /suite
+# Named to match the suite's path in its own repository. Playwright reports
+# test files relative to this directory, so a container-specific name like
+# /suite would surface in every investigation as "suite/tests/..." - a path
+# that does not exist in the project a reader would go looking in.
+WORKDIR /playwright-tests
 
 # The suite is staged here by deploy/build-runner.sh from the read-only
 # NovaCart repository; nothing there is modified.
