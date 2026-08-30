@@ -125,12 +125,20 @@ code,
   white-space: nowrap;
 }
 
+.brand-text {
+  min-width: 0; /* lets the flex child shrink instead of overflowing */
+}
+
 .brand-tagline {
   font-size: 10.5px;
   color: var(--text-faint);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;
+  /* The sidebar clips its overflow, so without these a long tagline is cut
+     mid-word. An ellipsis degrades honestly at any width. */
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar__nav {

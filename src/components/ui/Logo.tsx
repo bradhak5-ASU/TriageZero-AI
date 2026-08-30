@@ -1,9 +1,20 @@
 interface LogoProps {
   size?: number;
   withText?: boolean;
+  /**
+   * Overrides the tagline. The sidebar is 232px wide, leaving ~164px beside
+   * the mark - not enough for the full phrase at a legible size, where it
+   * clipped mid-word as "AUTONOMOUS FAILURE INTELLI". Places with room keep
+   * the full wording.
+   */
+  tagline?: string;
 }
 
-export function Logo({ size = 30, withText = true }: LogoProps) {
+export function Logo({
+  size = 30,
+  withText = true,
+  tagline = 'Autonomous Failure Intelligence',
+}: LogoProps) {
   return (
     <>
       <svg
@@ -27,7 +38,7 @@ export function Logo({ size = 30, withText = true }: LogoProps) {
       {withText && (
         <div className="brand-text">
           <div className="brand-name">TriageZero</div>
-          <div className="brand-tagline">Autonomous Failure Intelligence</div>
+          <div className="brand-tagline">{tagline}</div>
         </div>
       )}
     </>

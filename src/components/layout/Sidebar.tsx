@@ -41,7 +41,7 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
         aria-label="Primary navigation"
       >
         <div className="sidebar__brand">
-          <Logo withText={!collapsed || mobileOpen} />
+          <Logo withText={!collapsed || mobileOpen} tagline="Failure Intelligence" />
         </div>
         <div className="sidebar__nav">
           {navItems.map(({ to, label, icon: Icon, end }) => (
