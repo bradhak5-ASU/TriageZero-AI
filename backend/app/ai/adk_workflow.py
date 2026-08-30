@@ -47,6 +47,7 @@ from app.ai.schemas import (
     ProviderAttempt,
     StageSummary,
 )
+from app.core.logging import log_event
 from app.schemas.failure_package import FailurePackage
 
 WORKFLOW_STAGES = (
@@ -207,8 +208,18 @@ class GoogleAdkRunner:
             os.environ.setdefault("GEMINI_API_KEY", self._api_key)
 
     def _build(self) -> None:
-        if self._runner is not None:
-            return
+        """Construct a Runner and session service for THIS call.
+
+        These are deliberately not cached. Every run() creates a fresh event
+        loop via asyncio.run(), which closes when the call returns. An
+        InMemorySessionService built inside a closed loop holds references to
+        it, and awaiting it from the next loop hangs instead of failing -
+        investigations sat at status=analyzing, stage=evidence_normalized
+        forever, never reaching classification and never timing out cleanly.
+
+        Rebuilding costs a little startup per analysis and removes a whole
+        class of cross-loop deadlock.
+        """
         self._configure_environment()
         try:
             from google.adk.runners import Runner
@@ -249,6 +260,7 @@ class GoogleAdkRunner:
         except ImportError as exc:  # pragma: no cover - dependency present in image
             raise AnalyzerError("sdk_missing", "google-genai is not installed") from exc
 
+        log_event("adk analysis starting", model=self._model, timeout_s=self._timeout)
         session_id = f"analysis-{uuid.uuid4().hex}"
         user_id = "triagezero-analyzer"
         await self._session_service.create_session(
@@ -293,7 +305,13 @@ class GoogleAdkRunner:
                     app_name=self.APP_NAME, user_id=user_id, session_id=session_id
                 )
         if not final_text:
+            log_event("adk returned no final response", model=self._model)
             raise AnalyzerError("empty_response", "ADK returned no final response")
+        log_event(
+            "adk analysis complete",
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
         self.usage = {"input_tokens": input_tokens, "output_tokens": output_tokens}
         return self._parse_payload(final_text)
 
