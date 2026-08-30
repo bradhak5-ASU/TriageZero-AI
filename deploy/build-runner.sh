@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Build and deploy the scheduled Playwright runner as a Cloud Run Job.
+#
+# The NovaCart repo is read-only, so its test suite is copied into a scratch
+# build context and combined with the Dockerfile here. The copy is regenerated
+# every run, so it cannot drift from the source.
+set -euo pipefail
+
+SRC="${SUITE_SRC:-$HOME/Desktop/TriageZero/playwright-tests}"
+REGION="${REGION:-us-central1}"
+PROJECT="${PROJECT:-triagezero}"
+NOVA_WEB="${NOVACART_BASE_URL:?set NOVACART_BASE_URL to the novacart-web URL}"
+TZ_API="${TRIAGEZERO_API_URL:?set TRIAGEZERO_API_URL to the triagezero-api URL}"
+SCENARIO="${NOVACART_DEFECT_SCENARIO:-}"
+RUNNER_SA="triagezero-runner@${PROJECT}.iam.gserviceaccount.com"
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+CTX="$HERE/.runner-build"
+IMAGE="$REGION-docker.pkg.dev/$PROJECT/triagezero/test-runner:$(date +%s)"
+
+echo "==> staging suite from $SRC"
+rm -rf "$CTX"; mkdir -p "$CTX/suite"
+cp "$HERE/runner/Dockerfile" "$HERE/runner/run.sh" "$CTX/"
+rsync -a --exclude node_modules --exclude test-results --exclude .git \
+      --exclude playwright-report "$SRC/" "$CTX/suite/"
+
+echo "==> building $IMAGE"
+gcloud builds submit "$CTX" --project="$PROJECT" --tag="$IMAGE"
+
+echo "==> deploying job"
+gcloud run jobs deploy triagezero-scheduled-tests \
+  --project="$PROJECT" --region="$REGION" \
+  --image="$IMAGE" \
+  --service-account="$RUNNER_SA" \
+  --set-secrets=TRIAGEZERO_API_TOKEN=triagezero-ingestion-token:latest \
+  --set-env-vars="NOVACART_BASE_URL=$NOVA_WEB,TRIAGEZERO_API_URL=$TZ_API,RUN_CONTROLLED_DEFECTS=true,NOVACART_DEFECT_SCENARIO=$SCENARIO,CI=true" \
+  --max-retries=0 \
+  --task-timeout=10m \
+  --memory=2Gi --cpu=2
+
+echo "==> done. Run it now with:"
+echo "    gcloud run jobs execute triagezero-scheduled-tests --region=$REGION --wait"

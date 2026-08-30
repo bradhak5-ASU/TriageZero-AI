@@ -53,3 +53,4 @@ DEPLOY_RESUME.txt
 
 # scratch build context staged from the read-only NovaCart repo
 deploy/.novacart-build/
+deploy/.runner-build/
