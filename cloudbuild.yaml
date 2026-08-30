@@ -28,6 +28,7 @@ substitutions:
   _FIREBASE_AUTH_DOMAIN: ''
   _FIREBASE_PROJECT_ID: ''
   _FIREBASE_APP_ID: ''
+  _GENAI_LOCATION: global         # Vertex AI location for Gemini
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -99,24 +100,32 @@ steps:
       - Dockerfile.frontend
       - .
 
-  # --- 4. migrations as their own gate -------------------------------------
-  - id: migrate
-    name: '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_API_SERVICE}:${SHORT_SHA}'
-    waitFor: ['build-api']
-    entrypoint: bash
-    args:
-      - -c
-      - |
-        set -euo pipefail
-        # DATABASE_URL comes from Secret Manager; it is never written to a file
-        # or echoed. The migration CLI prints counts and index names only.
-        python -m app.db.migrate
-    secretEnv: ['DATABASE_URL']
+  # --- 4. migrations ---------------------------------------------------------
+  # There is deliberately NO separate migration step here.
+  #
+  # The DATABASE_URL secret uses the Cloud SQL socket form
+  # (?host=/cloudsql/INSTANCE). That socket is created by the Cloud SQL Auth
+  # Proxy that Cloud Run runs for services started with
+  # --add-cloudsql-instances. A Cloud Build worker has no such socket, so a
+  # migration step here would fail to connect no matter how it were configured.
+  #
+  # The application migrates on startup instead: init_db() runs create_all()
+  # followed by run_migrations(), which is idempotent and applies inside a
+  # single transaction, so a partial failure leaves the previous schema rather
+  # than a half-migrated one. /api/v1/readyz then reports 503 until the schema
+  # is actually present, so a revision that failed to migrate never receives
+  # traffic - the gate still exists, it just lives in the readiness check.
+  #
+  # For a system with real traffic the better answer is a Cloud Run *job*
+  # running `python -m app.db.migrate` with --set-cloudsql-instances, executed
+  # before the service is deployed. That is the documented upgrade path; it is
+  # not used here because a demo deployment gains little from it and every
+  # extra resource is another thing that can fail.
 
   # --- 5. deploy ------------------------------------------------------------
   - id: deploy-api
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
-    waitFor: ['migrate']
+    waitFor: ['build-api']
     entrypoint: gcloud
     args:
       - run
@@ -127,8 +136,12 @@ steps:
       - '--platform=managed'
       - '--allow-unauthenticated'
       - '--add-cloudsql-instances=${_SQL_INSTANCE}'
-      - '--set-env-vars=APP_ENV=production,FRONTEND_ORIGINS=${_WEB_ORIGIN},ANALYZER_MODE=gemini,API_AUTH_REQUIRED=true,FIREBASE_AUTH_ENABLED=true,FIREBASE_PROJECT_ID=${PROJECT_ID},GOOGLE_CLOUD_PROJECT=${PROJECT_ID}'
-      - '--set-secrets=DATABASE_URL=triagezero-database-url:latest,INGESTION_API_TOKEN=triagezero-ingestion-token:latest,DASHBOARD_API_TOKEN=triagezero-dashboard-token:latest,GEMINI_API_KEY=triagezero-gemini-key:latest'
+      # Gemini is reached through Vertex AI using the service account's own
+      # credentials (roles/aiplatform.user). No API key exists to store or leak,
+      # and the spend lands on this project's billing rather than a separate
+      # API quota.
+      - '--set-env-vars=APP_ENV=production,FRONTEND_ORIGINS=${_WEB_ORIGIN},ANALYZER_MODE=gemini,API_AUTH_REQUIRED=true,FIREBASE_AUTH_ENABLED=true,FIREBASE_PROJECT_ID=${PROJECT_ID},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_LOCATION=${_GENAI_LOCATION}'
+      - '--set-secrets=DATABASE_URL=triagezero-database-url:latest,INGESTION_API_TOKEN=triagezero-ingestion-token:latest,DASHBOARD_API_TOKEN=triagezero-dashboard-token:latest'
       - '--service-account=triagezero-api@${PROJECT_ID}.iam.gserviceaccount.com'
       # Scale-to-zero is fine for a demo, but a cold start that also has to
       # open a Cloud SQL connection is the slow first click a judge would see.
@@ -156,7 +169,3 @@ steps:
       - '--cpu=1'
       - '--memory=512Mi'
 
-availableSecrets:
-  secretManager:
-    - versionName: 'projects/${PROJECT_ID}/secrets/triagezero-database-url/versions/latest'
-      env: DATABASE_URL

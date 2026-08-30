@@ -45,3 +45,8 @@ npm-debug.log*
 
 # scratch produced while verifying; safe to delete
 _to_delete/
+
+# deployment variables — real identifiers and secrets, never committed
+deploy.env
+*.deploy.env
+DEPLOY_RESUME.txt
