@@ -64,6 +64,8 @@ are verified independently and cannot substitute for one another (see §10).
     Persist ──────► Dashboard ──────► Human approves or rejects
     (Cloud SQL)    (Firebase sign-in)  ← only this step needs a person
 
+![Sequence of an investigation](diagrams/architecture-sequence.png)
+
 The evidence a failing test carries is specific: failing network requests with status codes,
 browser console output, the assertion's expected and actual values, a stack trace, a
 screenshot and a Playwright trace. The analyzer reasons over that evidence and nothing else —
@@ -114,6 +116,8 @@ decisions rather than acting on external systems.
 
 Six Cloud Run workloads, one PostgreSQL instance with two isolated databases, and two
 schedules — all in a single Google Cloud project.
+
+![System architecture](diagrams/architecture-system.png)
 
 | Workload | Type | Role | Scaling |
 |---|---|---|---|
@@ -262,17 +266,45 @@ migration idempotency, and the full ingestion flow including the idempotency con
 - A scheduled run, triggered by the scheduler's own service account rather than a person,
   producing correctly classified investigations.
 
-### Reading the benchmark honestly
+### Accuracy on real failures
 
-The deterministic analyzer scores **1.00** across accuracy, macro-F1, severity and release risk
-on the synthetic holdout. **That number is close to meaningless as an accuracy claim**: the
-generator builds scenarios from the same signal vocabulary the rules encode, so it is
-near-tautological.
+The synthetic holdout is a regression tripwire, not an accuracy claim: its generator builds
+scenarios out of the same signal vocabulary the deterministic rules encode, so scoring **1.00**
+there is close to tautological. Accuracy was therefore measured a second way, on failures the
+platform produced itself.
 
-What the benchmark did deliver is real. Its first run scored macro-F1 0.6977 and failed its
-gate, because a benign console line disqualified a locator-timeout rule in 9 of 26 cases.
-**The fix went into the analyzer, not the dataset.** Treat the synthetic numbers as a
-regression tripwire; genuine accuracy requires labelled real failures.
+`scripts/measure_field_accuracy.py` reads every non-synthetic investigation in the deployed
+database and labels each one from evidence that exists independently of the analyzer: **the
+browser recorded an HTTP 5xx from the application**. A 5xx is the server admitting it failed.
+Playwright captured it, it travels in the failure package, and it is true whether or not
+TriageZero exists — no rule, prompt or heuristic in this repository has any say in it. The label
+is fixed before the analysis runs, which is what makes it ground truth rather than a restatement
+of the model's own reasoning.
+
+| Provider | Correct | Cases | Accuracy |
+|---|---|---|---|
+| `gemini_adk` — Google ADK agent on Vertex AI | 80 | 80 | **100%** |
+| `gemini` — direct Gen AI SDK | 4 | 4 | **100%** |
+| **Overall** | **84** | **84** | **100%** |
+
+- Sample: 112 investigations from unattended scheduled runs against the deployed shop.
+- 84 externally labelled; 28 excluded as not externally decidable, rather than guessed.
+- Disagreements: none.
+- Mean confidence where correct: **0.941** — calibrated, not merely assertive.
+
+The exclusions matter as much as the score. The undecidable 28 are the catalogue-exhaustion
+runs: the test fails at a disabled control with no failing request, and both "frontend defect"
+and "data defect" are defensible readings of that evidence. Scoring them either way would be the
+experimenter choosing the answer, so they sit outside the denominator.
+
+**Scope, stated plainly.** This is one defect class over 84 cases. It does not establish accuracy
+across the full eight-way classification space, and a second injected defect family would
+strengthen it. What it does establish is that on real browser evidence from a real deployment,
+with the answer fixed in advance, the agent was correct in every labelled case.
+
+The synthetic benchmark still earned its keep. Its first run scored macro-F1 0.6977 and failed
+its gate, because a benign console line was disqualifying a locator-timeout rule in 9 of 26
+cases. **The fix went into the analyzer, not the dataset.**
 
 ---
 
@@ -287,8 +319,9 @@ live application and files diagnosed investigations.
 | Human sign-in, with machine credentials kept separate | Operating |
 | Scheduled autonomous test runs | Operating |
 | Google ADK agent performing the analysis | Operating |
+| Classification accuracy measured on real failures | 84/84 (§11) |
 | Deterministic fallback on provider failure | Exercised |
-| Injectable defect scenarios for demonstration | Five available |
+| Controlled defect scenarios for demonstration | Six available |
 | Human review loop feeding the historical corpus | Built, no entries |
 | Collector distributed as an installable package | Not built |
 | External issue creation | Out of scope |
@@ -307,8 +340,9 @@ five minutes ahead of each test run.
 
 ## 13. Limitations
 
-- **Accuracy is unmeasured on real failures.** The synthetic benchmark is a regression tripwire,
-  not evidence of production accuracy (§11).
+- **Field accuracy covers one defect class.** 84/84 on real failures with externally verifiable
+  ground truth (§11), but from a single injected defect family; the full eight-way
+  classification space is not yet covered.
 - **The historical corpus is empty.** Similar-failure retrieval works, but has no human-reviewed
   cases to draw on yet, so its value grows only with use.
 - **Onboarding another project is manual.** Two collector files must be copied into the target
@@ -326,10 +360,12 @@ five minutes ahead of each test run.
 
 1. **Publish the collector** as an npm package or a Playwright reporter, reducing onboarding to
    an install and one configuration line.
-2. **Accumulate human-reviewed outcomes** so retrieval has genuine precedent and accuracy can be
-   measured against labelled real failures.
-3. **Migrate schema changes to a Cloud Run job** executed before the service deploys, rather than
+2. **Inject a second and third defect family** — a slow dependency and a data-integrity fault —
+   so the field measurement in §11 spans more of the classification space.
+3. **Accumulate human-reviewed outcomes** so retrieval has genuine precedent and accuracy can be
+   tracked against human verdicts as well as external evidence.
+4. **Migrate schema changes to a Cloud Run job** executed before the service deploys, rather than
    relying on startup migration and the readiness gate.
-4. **Adapters for other frameworks** — Cypress and Selenium — mapping their evidence into the
+5. **Adapters for other frameworks** — Cypress and Selenium — mapping their evidence into the
    same package.
-5. **External tracker integration**, so an approved action creates the issue it proposes.
+6. **External tracker integration**, so an approved action creates the issue it proposes.

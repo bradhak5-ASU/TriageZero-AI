@@ -141,7 +141,7 @@ Three analyzer modes share one interface and one validated result type:
 
 | `ANALYZER_MODE` | Behavior |
 |---|---|
-| `deterministic` (default) | Local rule engine — no credentials, no network |
+| `deterministic` (default) | Local rule engine — no credentials, no model call |
 | `gemini` | One structured-output call via `google-genai` |
 | `gemini_adk` | Staged Google ADK workflow with read-only tools |
 
@@ -179,6 +179,23 @@ npm audit                              # expected: 0 vulnerabilities
 npm run build && npm run preview
 ```
 
+## Architecture
+
+![System architecture](docs/diagrams/architecture-system.png)
+
+The large panel is the platform: the four things the API does to a failure, the analyzer
+interface behind it, and where the result lands. The small panel on the left is only the demo
+subject — drawn small because it is the one part meant to be replaced. TriageZero contains no
+knowledge of NovaCart; any application with a Playwright suite drops into that slot.
+
+`triagezero-web` mounts no secrets, has no database connection, and runs under a service account
+with no permissions. Every privileged action is performed by the API after it verifies the ID
+token of the person who asked. The Firebase web config in the bundle is a public identifier, not
+a credential; real credentials are never passed as build arguments, because build arguments are
+readable from an image's layer history.
+
+![Sequence of an investigation](docs/diagrams/architecture-sequence.png)
+
 ## Synthetic benchmark results
 
 The deterministic analyzer currently scores 1.00 accuracy / 1.00 macro-F1 on the
@@ -189,13 +206,19 @@ so a high score is close to tautological. Its real value: it caught a genuine
 analyzer bug (benign console noise was suppressing the locator-timeout rule,
 macro-F1 0.6977 before the fix), it enforces the safety gates on every run, and
 it gives Gemini/ADK a baseline to beat on identical data.
+
+Accuracy on **real** failures is measured separately, against ground truth the
+analyzer cannot influence — an HTTP 5xx recorded by the browser. On 84 externally
+labeled investigations from unattended scheduled runs: **84/84 correct (100%)**,
+ADK 80/80, mean confidence 0.941, no disagreements. Rerun it with
+`python scripts/measure_field_accuracy.py`.
 See [docs/EVALUATION.md](docs/EVALUATION.md).
 
 ## Current limitations
 
-- Direct Gemini has been verified locally on the six controlled NovaCart
-  scenarios; Google ADK and Vertex AI are implemented but not yet live-verified.
-- Synthetic benchmark numbers do not predict production accuracy.
+- Synthetic benchmark numbers do not predict production accuracy; the field
+  measurement above covers one defect class over 84 cases, not the full eight-way
+  classification space.
 - Artifacts are metadata only (no upload/download until Cloud Storage).
 - GitHub Actions links and issue creation are honest placeholders; decisions are recorded, never executed.
 - Local processing uses an in-process dispatcher (Pub/Sub replaces it later).

@@ -1,0 +1,321 @@
+<svg viewBox="0 0 1560 1490" role="img" aria-label="TriageZero system architecture in six tiers: the application under test, test execution, ingestion and processing, intelligence, persistence, and presentation and review" xmlns="http://www.w3.org/2000/svg">
+<style>
+  text { font-family: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif; }
+  .rule { stroke: #0f1720; stroke-width: 1.2; }
+  .rule-soft { stroke: #d8e0e8; stroke-width: 1; }
+  .tick { stroke: #d8e0e8; stroke-width: 1; }
+  .lane { fill: #f1f4f7; stroke: none; }
+  .tier-band { fill: #f1f4f7; stroke: none; opacity: 0.55; }
+  .t-tiernum {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 22px;
+    fill: #0b6e7f; font-weight: 500;
+  }
+  .t-tier {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px;
+    letter-spacing: 0.13em; fill: #0f1720; font-weight: 500;
+  }
+  .group { fill: none; stroke: #0b6e7f; stroke-width: 1.2; stroke-dasharray: 5 4; }
+  .group-warn { fill: #fbf1de; stroke: #8a5a00; stroke-width: 1.2; stroke-dasharray: 5 4; }
+
+  .box { fill: #fbfcfd; stroke: #d8e0e8; stroke-width: 1.3; }
+  .box-major { fill: #fbfcfd; stroke: #0b6e7f; stroke-width: 1.8; }
+  .box-step { fill: #f1f4f7; stroke: #d8e0e8; stroke-width: 1.1; }
+  .box-job { fill: #fbfcfd; stroke: #d8e0e8; stroke-width: 1.3; stroke-dasharray: 5 4; }
+  .box-goog { fill: #e7ecf1; stroke: #d8e0e8; stroke-width: 1.1; }
+  .box-data { fill: #fbfcfd; stroke: #146b4a; stroke-width: 1.4; }
+  .box-human { fill: #fbfcfd; stroke: #34424f; stroke-width: 1.3; }
+  .box-inner { fill: #fbfcfd; stroke: #d8e0e8; stroke-width: 1.1; }
+  .box-active { fill: #e3f1f3; stroke: #0b6e7f; stroke-width: 1.5; }
+  .box-sm { fill: #fbfcfd; stroke: #d8e0e8; stroke-width: 1.1; }
+  .box-life { fill: #e7ecf1; stroke: #d8e0e8; stroke-width: 1.2; }
+  .note-box { fill: #e3f1f3; stroke: #0b6e7f; stroke-width: 1.1; }
+  .activation { fill: #e3f1f3; stroke: #0b6e7f; stroke-width: 1.1; }
+  .label-plate { fill: #fbfcfd; stroke: none; }
+  .lifeline { stroke: #8595a4; stroke-width: 1; stroke-dasharray: 4 5; }
+
+  .badge { fill: #fbfcfd; stroke: #0b6e7f; stroke-width: 1.4; }
+  .t-badge {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px;
+    fill: #06525f; font-weight: 500;
+  }
+
+  .t-eyebrow {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px;
+    letter-spacing: 0.18em; fill: #0b6e7f;
+  }
+  .t-doc {
+    font-family: 'IBM Plex Serif', Georgia, serif; font-size: 26px; font-weight: 600;
+    fill: #0f1720; letter-spacing: -0.01em;
+  }
+  .t-meta {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px;
+    letter-spacing: 0.03em; fill: #5c6b7a;
+  }
+  .t-lane {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10.5px;
+    letter-spacing: 0.14em; fill: #06525f; font-weight: 500;
+  }
+  .t-group {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 9.5px;
+    letter-spacing: 0.12em; fill: #06525f; font-weight: 500;
+  }
+  .t-title { font-family: 'IBM Plex Sans', sans-serif; font-size: 15px; font-weight: 600; fill: #0f1720; }
+  .t-sm { font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; fill: #0f1720; }
+  .t-kind {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 9.5px;
+    letter-spacing: 0.11em; fill: #8595a4;
+  }
+  .t-sm-kind {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 9px;
+    letter-spacing: 0.1em; fill: #8595a4;
+  }
+  .t-stepnum {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px;
+    fill: #0b6e7f; font-weight: 500;
+  }
+  .t-step {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px;
+    letter-spacing: 0.11em; fill: #0f1720; font-weight: 500;
+  }
+  .t-note { font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; fill: #5c6b7a; }
+  .t-aside { font-family: 'IBM Plex Sans', sans-serif; font-size: 11.5px; fill: #8595a4; }
+  .t-legend { font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px; fill: #5c6b7a; }
+  .t-msg {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; fill: #34424f;
+    paint-order: stroke; stroke: #fbfcfd; stroke-width: 5px; stroke-linejoin: round;
+  }
+  .t-rail { font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; fill: #8595a4; }
+  .t-msgnum {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; fill: #0b6e7f;
+    font-weight: 500; paint-order: stroke; stroke: #fbfcfd; stroke-width: 5px; stroke-linejoin: round;
+  }
+
+  .edge { fill: none; stroke: #0b6e7f; stroke-width: 1.6; marker-end: url(#ah); }
+  .edge-both { fill: none; stroke: #0b6e7f; stroke-width: 1.6; marker-end: url(#ah); marker-start: url(#ah); }
+  .edge-int { fill: none; stroke: #8595a4; stroke-width: 1.2; marker-end: url(#ahm); }
+  .msg { fill: none; stroke: #0b6e7f; stroke-width: 1.6; marker-end: url(#ah); }
+  .msg-ret { fill: none; stroke: #8595a4; stroke-width: 1.4; stroke-dasharray: 5 4; marker-end: url(#ahm); }
+  .ah { fill: #0b6e7f; }
+  .ahm { fill: #8595a4; }
+
+  </style>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path class="ah" d="M0,0.6 L10,5 L0,9.4 Z"/></marker><marker id="ahm" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path class="ahm" d="M0,0.6 L10,5 L0,9.4 Z"/></marker></defs>
+<rect width="1560.0" height="1490.0" fill="#fbfcfd"/>
+<text class="t-eyebrow" x="40" y="32" text-anchor="start">TRIAGEZERO</text>
+<text class="t-doc" x="40" y="64" text-anchor="start">System Architecture</text>
+<text class="t-meta" x="1520" y="30" text-anchor="end">Google Cloud · region us-central1</text>
+<text class="t-meta" x="1520" y="49" text-anchor="end">6 Cloud Run workloads · 1 Cloud SQL instance · 2 schedules</text>
+<text class="t-meta" x="1520" y="68" text-anchor="end">Sheet 1 of 2 · v1.0</text>
+<line class="rule" x1="40" y1="92" x2="1520" y2="92"/>
+<rect class="tier-band" x="40" y="110" width="1480" height="190"/>
+<text class="t-tiernum" x="56" y="154" text-anchor="start">01</text>
+<text class="t-tier" x="56" y="178" text-anchor="start">APPLICATION UNDER TEST</text>
+<text class="t-aside" x="56" y="204" text-anchor="start">The system being watched.</text>
+<text class="t-aside" x="56" y="221" text-anchor="start">Deployed like any other</text>
+<text class="t-aside" x="56" y="238" text-anchor="start">product. TriageZero holds</text>
+<text class="t-aside" x="56" y="255" text-anchor="start">no knowledge of it.</text>
+<text class="t-tiernum" x="56" y="344" text-anchor="start">02</text>
+<text class="t-tier" x="56" y="368" text-anchor="start">TEST EXECUTION</text>
+<text class="t-aside" x="56" y="394" text-anchor="start">Unattended. A cron trigger</text>
+<text class="t-aside" x="56" y="411" text-anchor="start">and a real browser,</text>
+<text class="t-aside" x="56" y="428" text-anchor="start">twice an hour.</text>
+<rect class="tier-band" x="40" y="500" width="1480" height="240"/>
+<text class="t-tiernum" x="56" y="544" text-anchor="start">03</text>
+<text class="t-tier" x="56" y="568" text-anchor="start">INGESTION &amp; PROCESSING</text>
+<text class="t-aside" x="56" y="594" text-anchor="start">Where a failure becomes an</text>
+<text class="t-aside" x="56" y="611" text-anchor="start">investigation. Four steps,</text>
+<text class="t-aside" x="56" y="628" text-anchor="start">always in this order.</text>
+<text class="t-tiernum" x="56" y="784" text-anchor="start">04</text>
+<text class="t-tier" x="56" y="808" text-anchor="start">INTELLIGENCE</text>
+<text class="t-aside" x="56" y="834" text-anchor="start">One interface, three</text>
+<text class="t-aside" x="56" y="851" text-anchor="start">implementations. Reasons</text>
+<text class="t-aside" x="56" y="868" text-anchor="start">over the evidence and</text>
+<text class="t-aside" x="56" y="885" text-anchor="start">nothing else.</text>
+<rect class="tier-band" x="40" y="950" width="1480" height="150"/>
+<text class="t-tiernum" x="56" y="994" text-anchor="start">05</text>
+<text class="t-tier" x="56" y="1018" text-anchor="start">PERSISTENCE</text>
+<text class="t-aside" x="56" y="1044" text-anchor="start">Durable and auditable. The</text>
+<text class="t-aside" x="56" y="1061" text-anchor="start">verdict is stored beside the</text>
+<text class="t-aside" x="56" y="1078" text-anchor="start">evidence it came from.</text>
+<text class="t-tiernum" x="56" y="1144" text-anchor="start">06</text>
+<text class="t-tier" x="56" y="1168" text-anchor="start">PRESENTATION &amp; REVIEW</text>
+<text class="t-aside" x="56" y="1194" text-anchor="start">The only tier a person</text>
+<text class="t-aside" x="56" y="1211" text-anchor="start">touches, and the last</text>
+<text class="t-aside" x="56" y="1228" text-anchor="start">step in the chain.</text>
+<line class="rule-soft" x1="248" y1="110" x2="248" y2="1290"/>
+<rect class="group-warn" x="290" y="134" width="1180" height="142" rx="5"/>
+<text class="t-group" x="306" y="158" text-anchor="start" style="fill:#8a5a00">UNTRUSTED — A TEST CAN BE MADE TO LOG ANYTHING</text>
+<rect class="box" x="306" y="170" width="356" height="90" rx="4"/>
+<text class="t-kind" x="322" y="193" text-anchor="start">CLOUD RUN SERVICE · MIN 0</text>
+<text class="t-title" x="322" y="216" text-anchor="start" style="font-size:15px">novacart-web</text>
+<text class="t-note" x="322" y="236" text-anchor="start">Vite bundle behind nginx.</text>
+<text class="t-note" x="322" y="253" text-anchor="start">The shopfront a browser sees.</text>
+<path class="edge" d="M662,215 H698"/>
+<rect class="box" x="702" y="170" width="356" height="90" rx="4"/>
+<text class="t-kind" x="718" y="193" text-anchor="start">CLOUD RUN SERVICE · MIN 0</text>
+<text class="t-title" x="718" y="216" text-anchor="start" style="font-size:15px">novacart-api</text>
+<text class="t-note" x="718" y="236" text-anchor="start">Shop backend, with six</text>
+<text class="t-note" x="718" y="253" text-anchor="start">controlled defect scenarios.</text>
+<path class="edge" d="M1058,215 H1094"/>
+<rect class="box-data" x="1098" y="170" width="356" height="90" rx="4"/>
+<text class="t-kind" x="1114" y="193" text-anchor="start">CLOUD SQL DATABASE</text>
+<text class="t-title" x="1114" y="216" text-anchor="start" style="font-size:15px">novacartdb</text>
+<text class="t-note" x="1114" y="236" text-anchor="start">Own user, own database. No</text>
+<text class="t-note" x="1114" y="253" text-anchor="start">route to the investigation store.</text>
+<rect class="box-goog" x="306" y="330" width="356" height="140" rx="4"/>
+<text class="t-kind" x="322" y="353" text-anchor="start">GOOGLE CLOUD</text>
+<text class="t-title" x="322" y="376" text-anchor="start" style="font-size:15px">Cloud Scheduler</text>
+<text class="t-note" x="322" y="396" text-anchor="start">Two cron schedules. Invokes the</text>
+<text class="t-note" x="322" y="413" text-anchor="start">jobs as its own service identity,</text>
+<text class="t-note" x="322" y="430" text-anchor="start">so a run is never a person's</text>
+<text class="t-note" x="322" y="447" text-anchor="start">action.</text>
+<rect class="box-job" x="702" y="330" width="356" height="140" rx="4"/>
+<text class="t-kind" x="718" y="353" text-anchor="start">CLOUD RUN JOB</text>
+<text class="t-title" x="718" y="376" text-anchor="start" style="font-size:15px">triagezero-scheduled-tests</text>
+<text class="t-note" x="718" y="396" text-anchor="start">The Playwright suite, driving a real</text>
+<text class="t-note" x="718" y="413" text-anchor="start">Chromium against the deployed</text>
+<text class="t-note" x="718" y="430" text-anchor="start">shopfront. Exits 0 even when a test</text>
+<text class="t-note" x="718" y="447" text-anchor="start">fails — a failure is the input.</text>
+<rect class="box-inner" x="1098" y="330" width="356" height="140" rx="4"/>
+<text class="t-kind" x="1114" y="353" text-anchor="start">THE ONLY INVESTIGATION INPUT ACCEPTED</text>
+<text class="t-title" x="1114" y="377" text-anchor="start" style="font-size:15px">failure package v1.0</text>
+<text class="t-note" x="1114" y="399" text-anchor="start">Failing requests with status codes,</text>
+<text class="t-note" x="1114" y="416" text-anchor="start">console output, expected versus actual,</text>
+<text class="t-note" x="1114" y="433" text-anchor="start">stack trace, screenshot, trace.</text>
+<rect class="box-major" x="290" y="530" width="1180" height="180" rx="5"/>
+<text class="t-kind" x="306" y="554" text-anchor="start">CLOUD RUN SERVICE · MIN 1 · FASTAPI</text>
+<text class="t-title" x="306" y="580" text-anchor="start" style="font-size:19px">triagezero-api</text>
+<text class="t-note" x="306" y="606" text-anchor="start">One request in,</text>
+<text class="t-note" x="306" y="623" text-anchor="start">one investigation out.</text>
+<text class="t-note" x="306" y="650" text-anchor="start">Every privileged read</text>
+<text class="t-note" x="306" y="667" text-anchor="start">and write happens here.</text>
+<rect class="box-step" x="560" y="550" width="210" height="142" rx="4"/>
+<text class="t-stepnum" x="574" y="574" text-anchor="start">01</text>
+<text class="t-step" x="604" y="574" text-anchor="start">AUTHENTICATE</text>
+<text class="t-note" x="574" y="598" text-anchor="start" style="font-size:11.5px">Machine token, or a</text>
+<text class="t-note" x="574" y="615" text-anchor="start" style="font-size:11.5px">Firebase ID token.</text>
+<text class="t-note" x="574" y="632" text-anchor="start" style="font-size:11.5px">Presenting one on the</text>
+<text class="t-note" x="574" y="649" text-anchor="start" style="font-size:11.5px">other's route returns</text>
+<text class="t-note" x="574" y="666" text-anchor="start" style="font-size:11.5px">403, not 401.</text>
+<path class="edge" d="M770,621 H784"/>
+<rect class="box-step" x="788" y="550" width="210" height="142" rx="4"/>
+<text class="t-stepnum" x="802" y="574" text-anchor="start">02</text>
+<text class="t-step" x="832" y="574" text-anchor="start">VALIDATE</text>
+<text class="t-note" x="802" y="598" text-anchor="start" style="font-size:11.5px">Closed schema — unknown</text>
+<text class="t-note" x="802" y="615" text-anchor="start" style="font-size:11.5px">fields refused, not stored.</text>
+<text class="t-note" x="802" y="632" text-anchor="start" style="font-size:11.5px">Oracle fields rejected.</text>
+<text class="t-note" x="802" y="649" text-anchor="start" style="font-size:11.5px">A SHA-256 fingerprint</text>
+<text class="t-note" x="802" y="666" text-anchor="start" style="font-size:11.5px">makes retries safe.</text>
+<path class="edge" d="M998,621 H1012"/>
+<rect class="box-step" x="1016" y="550" width="210" height="142" rx="4"/>
+<text class="t-stepnum" x="1030" y="574" text-anchor="start">03</text>
+<text class="t-step" x="1060" y="574" text-anchor="start">ANALYSE</text>
+<text class="t-note" x="1030" y="598" text-anchor="start" style="font-size:11.5px">Retrieves comparable</text>
+<text class="t-note" x="1030" y="615" text-anchor="start" style="font-size:11.5px">resolved cases, then</text>
+<text class="t-note" x="1030" y="632" text-anchor="start" style="font-size:11.5px">delegates to the analyzer</text>
+<text class="t-note" x="1030" y="649" text-anchor="start" style="font-size:11.5px">interface below.</text>
+<path class="edge" d="M1226,621 H1240"/>
+<rect class="box-step" x="1244" y="550" width="210" height="142" rx="4"/>
+<text class="t-stepnum" x="1258" y="574" text-anchor="start">04</text>
+<text class="t-step" x="1288" y="574" text-anchor="start">DECIDE</text>
+<text class="t-note" x="1258" y="598" text-anchor="start" style="font-size:11.5px">Verdict checked against a</text>
+<text class="t-note" x="1258" y="615" text-anchor="start" style="font-size:11.5px">closed schema. Release risk</text>
+<text class="t-note" x="1258" y="632" text-anchor="start" style="font-size:11.5px">computed here by policy —</text>
+<text class="t-note" x="1258" y="649" text-anchor="start" style="font-size:11.5px">never taken from the</text>
+<text class="t-note" x="1258" y="666" text-anchor="start" style="font-size:11.5px">model.</text>
+<rect class="group" x="290" y="770" width="880" height="150" rx="5"/>
+<text class="t-group" x="306" y="794" text-anchor="start">ANALYZER · ONE INTERFACE, THREE IMPLEMENTATIONS · CHOSEN BY CONFIGURATION</text>
+<rect class="box-active" x="306" y="808" width="270" height="98" rx="4"/>
+<text class="t-sm-kind" x="320" y="830" text-anchor="start">ACTIVE IN PRODUCTION</text>
+<text class="t-sm" x="320" y="850" text-anchor="start" style="font-size:14px">gemini_adk</text>
+<text class="t-note" x="320" y="870" text-anchor="start" style="font-size:11px">Google ADK agent. Five</text>
+<text class="t-note" x="320" y="885" text-anchor="start" style="font-size:11px">read-only tools, 40-event</text>
+<text class="t-note" x="320" y="900" text-anchor="start" style="font-size:11px">budget.</text>
+<rect class="box-inner" x="595" y="808" width="270" height="98" rx="4"/>
+<text class="t-sm-kind" x="609" y="830" text-anchor="start">FIRST FALLBACK</text>
+<text class="t-sm" x="609" y="850" text-anchor="start" style="font-size:14px">gemini</text>
+<text class="t-note" x="609" y="870" text-anchor="start" style="font-size:11px">Direct Gen AI SDK. Same</text>
+<text class="t-note" x="609" y="885" text-anchor="start" style="font-size:11px">output schema, no tools,</text>
+<text class="t-note" x="609" y="900" text-anchor="start" style="font-size:11px">one round trip.</text>
+<rect class="box-inner" x="884" y="808" width="270" height="98" rx="4"/>
+<text class="t-sm-kind" x="898" y="830" text-anchor="start">LAST RESORT</text>
+<text class="t-sm" x="898" y="850" text-anchor="start" style="font-size:14px">deterministic</text>
+<text class="t-note" x="898" y="870" text-anchor="start" style="font-size:11px">Rule engine. No external-</text>
+<text class="t-note" x="898" y="885" text-anchor="start" style="font-size:11px">network tool access, no</text>
+<text class="t-note" x="898" y="900" text-anchor="start" style="font-size:11px">credentials — always answers.</text>
+<rect class="box-goog" x="1200" y="770" width="270" height="150" rx="4"/>
+<text class="t-kind" x="1216" y="793" text-anchor="start">GOOGLE CLOUD</text>
+<text class="t-title" x="1216" y="816" text-anchor="start" style="font-size:15px">Vertex AI — Gemini</text>
+<text class="t-note" x="1216" y="836" text-anchor="start">Reached through Application</text>
+<text class="t-note" x="1216" y="853" text-anchor="start">Default Credentials on the</text>
+<text class="t-note" x="1216" y="870" text-anchor="start">service account. No API key</text>
+<text class="t-note" x="1216" y="887" text-anchor="start">exists anywhere in this</text>
+<text class="t-note" x="1216" y="904" text-anchor="start">system.</text>
+<rect class="box-data" x="290" y="978" width="1180" height="110" rx="4"/>
+<text class="t-kind" x="306" y="1001" text-anchor="start">CLOUD SQL · POSTGRESQL 16</text>
+<text class="t-title" x="306" y="1024" text-anchor="start" style="font-size:17px">triagezerodb</text>
+<text class="t-note" x="306" y="1044" text-anchor="start">The verdict and the sanitised evidence it came from, in one row, so any conclusion can be audited against its input.</text>
+<text class="t-note" x="306" y="1061" text-anchor="start">Survives every restart, redeploy and scale-to-zero — which a container filesystem would not.</text>
+<rect class="box-human" x="290" y="1122" width="340" height="140" rx="4"/>
+<text class="t-kind" x="306" y="1145" text-anchor="start">PERSON</text>
+<text class="t-title" x="306" y="1168" text-anchor="start" style="font-size:15px">Reviewer</text>
+<text class="t-note" x="306" y="1188" text-anchor="start">Approves or rejects a</text>
+<text class="t-note" x="306" y="1205" text-anchor="start">completed investigation.</text>
+<text class="t-note" x="306" y="1222" text-anchor="start"></text>
+<text class="t-note" x="306" y="1239" text-anchor="start">Nothing upstream waits</text>
+<text class="t-note" x="306" y="1256" text-anchor="start">for them.</text>
+<rect class="box" x="660" y="1122" width="440" height="140" rx="4"/>
+<text class="t-kind" x="676" y="1145" text-anchor="start">CLOUD RUN SERVICE · MIN 1</text>
+<text class="t-title" x="676" y="1168" text-anchor="start" style="font-size:15px">triagezero-web</text>
+<text class="t-note" x="676" y="1188" text-anchor="start">React dashboard behind nginx. No secrets</text>
+<text class="t-note" x="676" y="1205" text-anchor="start">mounted, no database connection, no</text>
+<text class="t-note" x="676" y="1222" text-anchor="start">permissions on its service account —</text>
+<text class="t-note" x="676" y="1239" text-anchor="start">every request it makes is authorised by</text>
+<text class="t-note" x="676" y="1256" text-anchor="start">the signed-in person, not by the service.</text>
+<rect class="box-goog" x="1130" y="1122" width="340" height="140" rx="4"/>
+<text class="t-kind" x="1146" y="1145" text-anchor="start">GOOGLE</text>
+<text class="t-title" x="1146" y="1168" text-anchor="start" style="font-size:15px">Firebase Authentication</text>
+<text class="t-note" x="1146" y="1188" text-anchor="start">Short-lived ID tokens,</text>
+<text class="t-note" x="1146" y="1205" text-anchor="start">issued to people only.</text>
+<text class="t-note" x="1146" y="1222" text-anchor="start"></text>
+<text class="t-note" x="1146" y="1239" text-anchor="start">A machine credential is</text>
+<text class="t-note" x="1146" y="1256" text-anchor="start">refused on these routes.</text>
+<path class="edge" d="M662,400 H698"/>
+<path class="edge" d="M880,326 V312 H484 V266"/>
+<path class="edge" d="M880,470 V524"/>
+<path class="edge-both" d="M730,710 V764"/>
+<path class="edge-both" d="M1170,845 H1194"/>
+<path class="edge-both" d="M1470,690 H1494 V1033 H1476"/>
+<path class="edge" d="M630,1188 H654"/>
+<path class="edge-both" d="M1100,1188 H1124"/>
+<path class="edge" d="M880,1118 V1104 H277 V620 H284"/>
+<circle class="badge" cx="680" cy="400" r="12"/><text class="t-badge" x="680" y="404.5" text-anchor="middle">1</text>
+<circle class="badge" cx="620" cy="312" r="12"/><text class="t-badge" x="620" y="316.5" text-anchor="middle">2</text>
+<circle class="badge" cx="880" cy="497" r="12"/><text class="t-badge" x="880" y="501.5" text-anchor="middle">3</text>
+<circle class="badge" cx="730" cy="737" r="12"/><text class="t-badge" x="730" y="741.5" text-anchor="middle">4</text>
+<circle class="badge" cx="1182" cy="845" r="12"/><text class="t-badge" x="1182" y="849.5" text-anchor="middle">5</text>
+<circle class="badge" cx="1494" cy="862" r="12"/><text class="t-badge" x="1494" y="866.5" text-anchor="middle">6</text>
+<circle class="badge" cx="642" cy="1188" r="12"/><text class="t-badge" x="642" y="1192.5" text-anchor="middle">7</text>
+<circle class="badge" cx="1112" cy="1188" r="12"/><text class="t-badge" x="1112" y="1192.5" text-anchor="middle">8</text>
+<circle class="badge" cx="470" cy="1104" r="12"/><text class="t-badge" x="470" y="1108.5" text-anchor="middle">9</text>
+<line class="rule" x1="40" y1="1330" x2="1520" y2="1330"/>
+<text class="t-tier" x="40" y="1358" text-anchor="start">KEY TO NUMBERED FLOWS</text>
+<circle class="badge" cx="52" cy="1386" r="12"/><text class="t-badge" x="52" y="1390.5" text-anchor="middle">1</text>
+<text class="t-legend" x="74" y="1390" text-anchor="start">Cron trigger at :00 and :30. No person is involved.</text>
+<circle class="badge" cx="52" cy="1416" r="12"/><text class="t-badge" x="52" y="1420.5" text-anchor="middle">2</text>
+<text class="t-legend" x="74" y="1420" text-anchor="start">The job drives a real Chromium through the deployed shopfront.</text>
+<circle class="badge" cx="52" cy="1446" r="12"/><text class="t-badge" x="52" y="1450.5" text-anchor="middle">3</text>
+<text class="t-legend" x="74" y="1450" text-anchor="start">On failure, failure package v1.0 is posted on a machine token.</text>
+<circle class="badge" cx="552" cy="1386" r="12"/><text class="t-badge" x="552" y="1390.5" text-anchor="middle">4</text>
+<text class="t-legend" x="574" y="1390" text-anchor="start">Sanitised evidence out; a schema-validated verdict back.</text>
+<circle class="badge" cx="552" cy="1416" r="12"/><text class="t-badge" x="552" y="1420.5" text-anchor="middle">5</text>
+<text class="t-legend" x="574" y="1420" text-anchor="start">Both model paths reach Gemini through Vertex AI.</text>
+<circle class="badge" cx="552" cy="1446" r="12"/><text class="t-badge" x="552" y="1450.5" text-anchor="middle">6</text>
+<text class="t-legend" x="574" y="1450" text-anchor="start">Verdict and evidence written, and read back on demand.</text>
+<circle class="badge" cx="1052" cy="1386" r="12"/><text class="t-badge" x="1052" y="1390.5" text-anchor="middle">7</text>
+<text class="t-legend" x="1074" y="1390" text-anchor="start">A reviewer opens the dashboard.</text>
+<circle class="badge" cx="1052" cy="1416" r="12"/><text class="t-badge" x="1052" y="1420.5" text-anchor="middle">8</text>
+<text class="t-legend" x="1074" y="1420" text-anchor="start">Sign-in issues a short-lived Firebase ID token.</text>
+<circle class="badge" cx="1052" cy="1446" r="12"/><text class="t-badge" x="1052" y="1450.5" text-anchor="middle">9</text>
+<text class="t-legend" x="1074" y="1450" text-anchor="start">The dashboard calls the API with that token — never the data directly.</text>
+</svg>

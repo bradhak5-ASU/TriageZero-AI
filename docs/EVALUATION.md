@@ -157,3 +157,38 @@ What the benchmark *is* good for, and has already delivered:
 
 Treat the synthetic numbers as a regression tripwire, not evidence of production
 accuracy. Real accuracy requires labeled real failures.
+
+## Field accuracy on real failures
+
+That labeled set now exists, and it is not labeled by us. `scripts/measure_field_accuracy.py`
+reads the investigations produced by unattended scheduled runs against the deployed
+application and takes ground truth from evidence outside the analyzer's reach: the
+browser recorded an HTTP 5xx from the application. A 5xx is the server admitting it
+failed — Playwright captured it, it travels in the failure package, and no rule or
+prompt in this repository has any say in it.
+
+| Provider | Correct | Cases | Accuracy |
+|---|---|---|---|
+| `gemini_adk` (Google ADK on Vertex AI) | 80 | 80 | 100% |
+| `gemini` (direct Gen AI SDK) | 4 | 4 | 100% |
+| Overall | 84 | 84 | 100% |
+
+112 investigations read; 84 externally labeled, 28 excluded as not externally
+decidable rather than guessed. No disagreements. Mean confidence where correct:
+0.941.
+
+The excluded 28 are the catalogue-exhaustion runs, where the test fails at a
+disabled control with no failing request and both "frontend defect" and "data
+defect" are defensible readings. Scoring those either way would be the
+experimenter choosing the answer.
+
+Scope: one defect class, 84 cases. It does not establish accuracy across the full
+eight-way classification space. It does establish that on real browser evidence
+from a real deployment, with the label fixed before the analysis ran, the agent
+was correct in every decidable case.
+
+Rerun it:
+
+```bash
+DATABASE_URL=... python scripts/measure_field_accuracy.py
+```

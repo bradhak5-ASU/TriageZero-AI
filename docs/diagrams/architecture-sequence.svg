@@ -1,0 +1,230 @@
+<svg viewBox="0 0 1560 1270" role="img" aria-label="Sequence diagram of one investigation, from a failing test through analysis and persistence to human review" xmlns="http://www.w3.org/2000/svg">
+<style>
+  text { font-family: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif; }
+  .rule { stroke: #0f1720; stroke-width: 1.2; }
+  .rule-soft { stroke: #d8e0e8; stroke-width: 1; }
+  .tick { stroke: #d8e0e8; stroke-width: 1; }
+  .lane { fill: #f1f4f7; stroke: none; }
+  .tier-band { fill: #f1f4f7; stroke: none; opacity: 0.55; }
+  .t-tiernum {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 22px;
+    fill: #0b6e7f; font-weight: 500;
+  }
+  .t-tier {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px;
+    letter-spacing: 0.13em; fill: #0f1720; font-weight: 500;
+  }
+  .group { fill: none; stroke: #0b6e7f; stroke-width: 1.2; stroke-dasharray: 5 4; }
+  .group-warn { fill: #fbf1de; stroke: #8a5a00; stroke-width: 1.2; stroke-dasharray: 5 4; }
+
+  .box { fill: #fbfcfd; stroke: #d8e0e8; stroke-width: 1.3; }
+  .box-major { fill: #fbfcfd; stroke: #0b6e7f; stroke-width: 1.8; }
+  .box-step { fill: #f1f4f7; stroke: #d8e0e8; stroke-width: 1.1; }
+  .box-job { fill: #fbfcfd; stroke: #d8e0e8; stroke-width: 1.3; stroke-dasharray: 5 4; }
+  .box-goog { fill: #e7ecf1; stroke: #d8e0e8; stroke-width: 1.1; }
+  .box-data { fill: #fbfcfd; stroke: #146b4a; stroke-width: 1.4; }
+  .box-human { fill: #fbfcfd; stroke: #34424f; stroke-width: 1.3; }
+  .box-inner { fill: #fbfcfd; stroke: #d8e0e8; stroke-width: 1.1; }
+  .box-active { fill: #e3f1f3; stroke: #0b6e7f; stroke-width: 1.5; }
+  .box-sm { fill: #fbfcfd; stroke: #d8e0e8; stroke-width: 1.1; }
+  .box-life { fill: #e7ecf1; stroke: #d8e0e8; stroke-width: 1.2; }
+  .note-box { fill: #e3f1f3; stroke: #0b6e7f; stroke-width: 1.1; }
+  .activation { fill: #e3f1f3; stroke: #0b6e7f; stroke-width: 1.1; }
+  .label-plate { fill: #fbfcfd; stroke: none; }
+  .lifeline { stroke: #8595a4; stroke-width: 1; stroke-dasharray: 4 5; }
+
+  .badge { fill: #fbfcfd; stroke: #0b6e7f; stroke-width: 1.4; }
+  .t-badge {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px;
+    fill: #06525f; font-weight: 500;
+  }
+
+  .t-eyebrow {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px;
+    letter-spacing: 0.18em; fill: #0b6e7f;
+  }
+  .t-doc {
+    font-family: 'IBM Plex Serif', Georgia, serif; font-size: 26px; font-weight: 600;
+    fill: #0f1720; letter-spacing: -0.01em;
+  }
+  .t-meta {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px;
+    letter-spacing: 0.03em; fill: #5c6b7a;
+  }
+  .t-lane {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10.5px;
+    letter-spacing: 0.14em; fill: #06525f; font-weight: 500;
+  }
+  .t-group {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 9.5px;
+    letter-spacing: 0.12em; fill: #06525f; font-weight: 500;
+  }
+  .t-title { font-family: 'IBM Plex Sans', sans-serif; font-size: 15px; font-weight: 600; fill: #0f1720; }
+  .t-sm { font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; fill: #0f1720; }
+  .t-kind {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 9.5px;
+    letter-spacing: 0.11em; fill: #8595a4;
+  }
+  .t-sm-kind {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 9px;
+    letter-spacing: 0.1em; fill: #8595a4;
+  }
+  .t-stepnum {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px;
+    fill: #0b6e7f; font-weight: 500;
+  }
+  .t-step {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px;
+    letter-spacing: 0.11em; fill: #0f1720; font-weight: 500;
+  }
+  .t-note { font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; fill: #5c6b7a; }
+  .t-aside { font-family: 'IBM Plex Sans', sans-serif; font-size: 11.5px; fill: #8595a4; }
+  .t-legend { font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px; fill: #5c6b7a; }
+  .t-msg {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; fill: #34424f;
+    paint-order: stroke; stroke: #fbfcfd; stroke-width: 5px; stroke-linejoin: round;
+  }
+  .t-rail { font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; fill: #8595a4; }
+  .t-msgnum {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; fill: #0b6e7f;
+    font-weight: 500; paint-order: stroke; stroke: #fbfcfd; stroke-width: 5px; stroke-linejoin: round;
+  }
+
+  .edge { fill: none; stroke: #0b6e7f; stroke-width: 1.6; marker-end: url(#ah); }
+  .edge-both { fill: none; stroke: #0b6e7f; stroke-width: 1.6; marker-end: url(#ah); marker-start: url(#ah); }
+  .edge-int { fill: none; stroke: #8595a4; stroke-width: 1.2; marker-end: url(#ahm); }
+  .msg { fill: none; stroke: #0b6e7f; stroke-width: 1.6; marker-end: url(#ah); }
+  .msg-ret { fill: none; stroke: #8595a4; stroke-width: 1.4; stroke-dasharray: 5 4; marker-end: url(#ahm); }
+  .ah { fill: #0b6e7f; }
+  .ahm { fill: #8595a4; }
+
+  </style>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path class="ah" d="M0,0.6 L10,5 L0,9.4 Z"/></marker><marker id="ahm" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path class="ahm" d="M0,0.6 L10,5 L0,9.4 Z"/></marker></defs>
+<rect width="1560.0" height="1270.0" fill="#fbfcfd"/>
+<text class="t-eyebrow" x="40" y="32" text-anchor="start">TRIAGEZERO</text>
+<text class="t-doc" x="40" y="64" text-anchor="start">Sequence of an Investigation</text>
+<text class="t-meta" x="1520" y="30" text-anchor="end">One failing test, end to end</text>
+<text class="t-meta" x="1520" y="49" text-anchor="end">Solid line: a call · dashed line: its return</text>
+<text class="t-meta" x="1520" y="68" text-anchor="end">Sheet 2 of 2 · v1.0</text>
+<line class="rule" x1="40" y1="92" x2="1520" y2="92"/>
+<rect class="box-life" x="25" y="124" width="190" height="62" rx="4"/>
+<text class="t-sm-kind" x="120" y="146" text-anchor="middle">CLOUD RUN JOB</text>
+<text class="t-sm" x="120" y="168" text-anchor="middle" style="font-size:11.5px">triagezero-scheduled-tests</text>
+<line class="lifeline" x1="120" y1="196" x2="120" y2="1130"/>
+<rect class="box-life" x="225" y="124" width="190" height="62" rx="4"/>
+<text class="t-sm-kind" x="320" y="146" text-anchor="middle">CLOUD RUN SERVICE</text>
+<text class="t-sm" x="320" y="168" text-anchor="middle" style="font-size:13.5px">triagezero-api</text>
+<line class="lifeline" x1="320" y1="196" x2="320" y2="1130"/>
+<rect class="box-life" x="425" y="124" width="190" height="62" rx="4"/>
+<text class="t-sm-kind" x="520" y="146" text-anchor="middle">ANALYZER</text>
+<text class="t-sm" x="520" y="168" text-anchor="middle" style="font-size:13.5px">gemini_adk</text>
+<line class="lifeline" x1="520" y1="196" x2="520" y2="1130"/>
+<rect class="box-life" x="625" y="124" width="190" height="62" rx="4"/>
+<text class="t-sm-kind" x="720" y="146" text-anchor="middle">GOOGLE CLOUD</text>
+<text class="t-sm" x="720" y="168" text-anchor="middle" style="font-size:13.5px">Vertex AI</text>
+<line class="lifeline" x1="720" y1="196" x2="720" y2="1130"/>
+<rect class="box-life" x="825" y="124" width="190" height="62" rx="4"/>
+<text class="t-sm-kind" x="920" y="146" text-anchor="middle">CLOUD SQL</text>
+<text class="t-sm" x="920" y="168" text-anchor="middle" style="font-size:13.5px">triagezerodb</text>
+<line class="lifeline" x1="920" y1="196" x2="920" y2="1130"/>
+<rect class="box-life" x="1025" y="124" width="190" height="62" rx="4"/>
+<text class="t-sm-kind" x="1120" y="146" text-anchor="middle">DASHBOARD</text>
+<text class="t-sm" x="1120" y="168" text-anchor="middle" style="font-size:13.5px">triagezero-web</text>
+<line class="lifeline" x1="1120" y1="196" x2="1120" y2="1130"/>
+<rect class="activation" x="314" y="236" width="12" height="870"/>
+<rect class="activation" x="514" y="506" width="12" height="118"/>
+<rect class="activation" x="714" y="544" width="12" height="42"/>
+<path class="msg" d="M127,236 H311"/>
+<rect class="label-plate" x="132" y="213" width="466" height="16"/>
+<text class="t-msgnum" x="136" y="225" text-anchor="start">1</text>
+<text class="t-msg" x="162" y="225" text-anchor="start">POST /api/v1/investigations — failure package v1.0, machine token</text>
+<path class="msg-ret" d="M313,274 H129"/>
+<rect class="label-plate" x="132" y="251" width="200" height="16"/>
+<text class="t-msgnum" x="136" y="263" text-anchor="start">2</text>
+<text class="t-msg" x="162" y="263" text-anchor="start">202 Accepted, immediately</text>
+<path class="msg" d="M327,430 H911"/>
+<rect class="label-plate" x="332" y="407" width="247" height="16"/>
+<text class="t-msgnum" x="336" y="419" text-anchor="start">3</text>
+<text class="t-msg" x="362" y="419" text-anchor="start">SELECT comparable resolved cases</text>
+<path class="msg-ret" d="M913,468 H329"/>
+<rect class="label-plate" x="332" y="445" width="94" height="16"/>
+<text class="t-msgnum" x="336" y="457" text-anchor="start">4</text>
+<text class="t-msg" x="362" y="457" text-anchor="start">precedent</text>
+<path class="msg" d="M327,506 H511"/>
+<rect class="label-plate" x="332" y="483" width="220" height="16"/>
+<text class="t-msgnum" x="336" y="495" text-anchor="start">5</text>
+<text class="t-msg" x="362" y="495" text-anchor="start">analyse(evidence, precedent)</text>
+<path class="msg" d="M527,544 H711"/>
+<rect class="label-plate" x="532" y="521" width="366" height="16"/>
+<text class="t-msgnum" x="536" y="533" text-anchor="start">6</text>
+<text class="t-msg" x="562" y="533" text-anchor="start">generate — five read-only tools, at most 40 events</text>
+<path class="msg-ret" d="M713,582 H529"/>
+<rect class="label-plate" x="532" y="559" width="120" height="16"/>
+<text class="t-msgnum" x="536" y="571" text-anchor="start">7</text>
+<text class="t-msg" x="562" y="571" text-anchor="start">draft verdict</text>
+<path class="msg-ret" d="M513,620 H329"/>
+<rect class="label-plate" x="332" y="597" width="313" height="16"/>
+<text class="t-msgnum" x="336" y="609" text-anchor="start">8</text>
+<text class="t-msg" x="362" y="609" text-anchor="start">verdict, validated against a closed schema</text>
+<path class="msg" d="M327,862 H911"/>
+<rect class="label-plate" x="332" y="839" width="386" height="16"/>
+<text class="t-msgnum" x="336" y="851" text-anchor="start">9</text>
+<text class="t-msg" x="362" y="851" text-anchor="start">INSERT investigation — verdict and sanitised evidence</text>
+<path class="msg" d="M1113,910 H329"/>
+<rect class="label-plate" x="332" y="887" width="340" height="16"/>
+<text class="t-msgnum" x="336" y="899" text-anchor="start">10</text>
+<text class="t-msg" x="362" y="899" text-anchor="start">GET /api/v1/investigations — Firebase ID token</text>
+<path class="msg" d="M327,948 H911"/>
+<rect class="label-plate" x="332" y="925" width="74" height="16"/>
+<text class="t-msgnum" x="336" y="937" text-anchor="start">11</text>
+<text class="t-msg" x="362" y="937" text-anchor="start">SELECT</text>
+<path class="msg-ret" d="M913,986 H329"/>
+<rect class="label-plate" x="332" y="963" width="61" height="16"/>
+<text class="t-msgnum" x="336" y="975" text-anchor="start">12</text>
+<text class="t-msg" x="362" y="975" text-anchor="start">rows</text>
+<path class="msg-ret" d="M327,1024 H1111"/>
+<rect class="label-plate" x="332" y="1001" width="127" height="16"/>
+<text class="t-msgnum" x="336" y="1013" text-anchor="start">13</text>
+<text class="t-msg" x="362" y="1013" text-anchor="start">investigations</text>
+<path class="msg" d="M1113,1062 H329"/>
+<rect class="label-plate" x="332" y="1039" width="446" height="16"/>
+<text class="t-msgnum" x="336" y="1051" text-anchor="start">14</text>
+<text class="t-msg" x="362" y="1051" text-anchor="start">POST /api/v1/investigations/{id}/resolution — reviewed outcome</text>
+<path class="msg" d="M327,1100 H911"/>
+<rect class="label-plate" x="332" y="1077" width="353" height="16"/>
+<text class="t-msgnum" x="336" y="1089" text-anchor="start">15</text>
+<text class="t-msg" x="362" y="1089" text-anchor="start">UPDATE — resolved case becomes labeled precedent</text>
+<rect class="note-box" x="216" y="300" width="900" height="97" rx="4"/>
+<text class="t-group" x="234" y="324" text-anchor="start">VALIDATION GATE</text>
+<text class="t-note" x="234" y="346" text-anchor="start">Closed schema — unknown fields are refused rather than stored. A package that</text>
+<text class="t-note" x="234" y="363" text-anchor="start">leaks the answer is rejected outright. A SHA-256 fingerprint makes any</text>
+<text class="t-note" x="234" y="380" text-anchor="start">resubmission idempotent, so a retried run never creates a second case.</text>
+<rect class="note-box" x="216" y="664" width="900" height="80" rx="4"/>
+<text class="t-group" x="234" y="688" text-anchor="start">GRACEFUL DEGRADATION</text>
+<text class="t-note" x="234" y="710" text-anchor="start">If the ADK path fails: gemini, then the deterministic rule engine.</text>
+<text class="t-note" x="234" y="727" text-anchor="start">The system always returns something honest, or marks the case needs_review.</text>
+<rect class="note-box" x="216" y="760" width="900" height="80" rx="4"/>
+<text class="t-group" x="234" y="784" text-anchor="start">THE LOAD-BEARING GUARANTEE</text>
+<text class="t-note" x="234" y="806" text-anchor="start">Release risk is computed here by deterministic policy. No text inside the</text>
+<text class="t-note" x="234" y="823" text-anchor="start">evidence can talk the system into calling a critical failure safe.</text>
+<line class="rule-soft" x1="1240" y1="196" x2="1240" y2="1130"/>
+<line class="tick" x1="1240" y1="236" x2="1256" y2="236"/>
+<text class="t-rail" x="1268" y="240" text-anchor="start">The only evidence payload</text>
+<text class="t-rail" x="1268" y="257" text-anchor="start">accepted by the investigation</text>
+<text class="t-rail" x="1268" y="274" text-anchor="start">pipeline.</text>
+<line class="tick" x1="1240" y1="506" x2="1256" y2="506"/>
+<text class="t-rail" x="1268" y="510" text-anchor="start">No codebase, no filesystem,</text>
+<text class="t-rail" x="1268" y="527" text-anchor="start">no shell, no external-network</text>
+<text class="t-rail" x="1268" y="544" text-anchor="start">tool access — the agent sees</text>
+<text class="t-rail" x="1268" y="561" text-anchor="start">only the evidence it was given.</text>
+<line class="tick" x1="1240" y1="910" x2="1256" y2="910"/>
+<text class="t-rail" x="1268" y="914" text-anchor="start">A machine token on this</text>
+<text class="t-rail" x="1268" y="931" text-anchor="start">route would return 403.</text>
+<line class="tick" x1="1240" y1="1100" x2="1256" y2="1100"/>
+<text class="t-rail" x="1268" y="1104" text-anchor="start">This is what closes the loop:</text>
+<text class="t-rail" x="1268" y="1121" text-anchor="start">step 15 supplies the</text>
+<text class="t-rail" x="1268" y="1138" text-anchor="start">precedent for step 3.</text>
+<line class="rule" x1="40" y1="1180" x2="1520" y2="1180"/>
+<text class="t-legend" x="40" y="1210" text-anchor="start">Steps 1 to 9 run unattended, every thirty minutes. Steps 10 to 15 are the only part of the system a person touches.</text>
+<text class="t-legend" x="40" y="1234" text-anchor="start">The dashboard never reaches the database. Every privileged read and write is performed by the API after it verifies the caller's token.</text>
+</svg>
